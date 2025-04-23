@@ -193,15 +193,15 @@ class VertexLLM(ProviderBase):
 
     @property
     def provider_name(self) -> KnownModelName:
-        return "google-vertex:gemini-2.0-flash"
+        return "google-vertex:gemini-2.5-flash-preview-04-17"
 
     @property
     def model(self) -> Model:
-        return GeminiModel("gemini-2.0-flash", provider=self.provider)
+        return GeminiModel("gemini-2.5-flash-preview-04-17", provider=self.provider)
 
     async def generate_multimodal(self, prompt: str, image: bytes):  # type: ignore
         client = vertexai.generative_models.GenerativeModel(
-            model_name="gemini-2.0-flash",
+            model_name="gemini-2.5-flash-preview-04-17",
         )
         part_1_bytes = vertexai.generative_models.Image.from_bytes(image)
         part_1 = vertexai.generative_models.Part.from_image(part_1_bytes)
@@ -219,7 +219,7 @@ class VertexLLM(ProviderBase):
 
     async def generate_text(self, prompt: str):
         client = vertexai.generative_models.GenerativeModel(
-            model_name="gemini-2.0-flash",
+            model_name="gemini-2.5-flash-preview-04-17",
         )
         response = client.generate_content(
             contents=[

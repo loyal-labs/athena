@@ -132,7 +132,7 @@ class EventBus(EventBusInterface):
         if coros:
             await gather(*coros)
 
-    async def request(self, topic: Enum, timeout: float = 5.0, **kwargs: Any) -> Any:
+    async def request(self, topic: Enum, timeout: float = 30.0, **kwargs: Any) -> Any:
         """Send a request event, return the result"""
         event_dict = {key: value for key, value in kwargs.items() if value is not None}
         event = Event.from_dict(topic, event_dict)

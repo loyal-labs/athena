@@ -8,7 +8,12 @@ import uvloop
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.containers import Container, create_container, init_service
+from src.containers import (
+    Container,
+    create_container,
+    init_service,
+    init_service_and_register,
+)
 from src.shared.config import shared_config
 
 logger = logging.getLogger("athena.main-app-component")
@@ -42,21 +47,28 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         _,
         db_instance,
         telegram_object,
-        _,
+        event_bus,
         _,
     ) = await asyncio.gather(*key_service_init_tasks)
 
     # --- Service Initialization ---
     try:
         logger.debug("Initializing services")
+        message_handlers = container.message_handlers()
 
         async_service_start_tasks = [
             db_instance.create_all(),
-            telegram_object.start(),
+            telegram_object.start(handlers=message_handlers.message_handlers),
+        ]
+
+        async_init_tasks = [
+            init_service_and_register(container.messages_service, event_bus),
+            init_service_and_register(container.posts_service, event_bus),
         ]
 
         async_tasks = [
             *async_service_start_tasks,
+            *async_init_tasks,
         ]
 
         await asyncio.gather(*async_tasks)

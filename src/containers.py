@@ -18,6 +18,10 @@ from src.shared.types import SessionFactory
 from src.shared.uow import UnitOfWork
 from src.telegram.client.client_config import TelegramConfig
 from src.telegram.client.client_object import TelegramBot
+from src.telegram.messages.messages_handlers import MessageHandlers
+from src.telegram.messages.messages_service import MessagesService
+from src.telemetree.posts.posts_service import PostsService
+from src.telemetree.shared.telemetree_config import TelemetreeConfig
 
 logger = logging.getLogger("athena.containers")
 
@@ -63,6 +67,12 @@ class Container(containers.DeclarativeContainer):
     # -- LLM Providers --
     model_config = providers.Factory(VertexConfig)
     model_object = providers.Singleton(VertexLLM, config=model_config)
+
+    # -- Telemetree Integrations --
+    telemetree_config = providers.Factory(TelemetreeConfig)
+    message_handlers = providers.Factory(MessageHandlers, event_bus=event_bus)
+    posts_service = providers.Factory(PostsService, config=telemetree_config)
+    messages_service = providers.Factory(MessagesService, event_bus=event_bus)
 
 
 def find_modules_in_packages(packages_paths: list[str]) -> list[str]:
@@ -115,10 +125,10 @@ def create_container() -> Container:
     container = Container()
 
     packages_to_wire = [
-        "src.agents",
-        "src.api",
-        "src.now_the_game",
         "src.shared",
+        "src.telegram",
+        "src.telegraph",
+        "src.telemetree",
     ]
     modules_to_wire = find_modules_in_packages(packages_to_wire)  # type: ignore
     container.wire(modules=modules_to_wire)
