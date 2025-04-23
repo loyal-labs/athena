@@ -10,7 +10,7 @@ from pyrogram.types import Message
 from src.shared.event_bus import EventBus
 from src.shared.events import EventPayload
 
-logger = logging.getLogger("athena.telegram.messages")
+logger = logging.getLogger("athena.telegram.messages.schemas")
 
 """
 AGENTS
@@ -43,7 +43,8 @@ class GramMessage(BaseModel):
             assert message.from_user
             assert message.date
         except AssertionError as e:
-            logger.error(f"Message {message.id} has no text, from_user, or date")
+            logger.error("Message: %s", message)
+            logger.error("Message %s has no text, from_user, or date", message.id)
             raise e
         except Exception as e:
             logger.exception(

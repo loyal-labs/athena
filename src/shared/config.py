@@ -34,7 +34,7 @@ class BaseAccess:
     ) -> str:
         """Resolves a secret from Secret Manager or local environment."""
         return (
-            local_secret
+            self._get_local_secret(local_secret)
             if not cloud_secret_id
             else self._get_cloud_secret(self._get_google_project_id(), cloud_secret_id)
         )
@@ -163,10 +163,14 @@ SHARED CONFIG
 
 
 class SharedConfig(BaseConfig):
-    app_env: Literal["local", "cloud"] = "local"
-    stage: Literal["dev", "prod"] = "dev"
-    event_bus: Literal["local"] = "local"
-    debug_mode: bool = True
+    app_env: Literal["local", "cloud"] = Field(
+        "local", validation_alias="GLOBAL_APP_ENV"
+    )
+    stage: Literal["dev", "prod"] = Field("dev", validation_alias="GLOBAL_STAGE")
+    event_bus: Literal["local"] = Field(
+        "local", validation_alias="GLOBAL_EVENT_BUS_TYPE"
+    )
+    debug_mode: bool = Field(True, validation_alias="GLOBAL_DEBUG_MODE")
 
     log_level: int = logging.DEBUG if debug_mode else logging.INFO
 
@@ -188,7 +192,12 @@ class SharedConfig(BaseConfig):
             raise ValueError(f"Invalid app environment: {self.app_env}")
 
 
-shared_config = SharedConfig()
+shared_config = SharedConfig(
+    app_env="local",
+    stage="dev",
+    event_bus="local",
+    debug_mode=True,
+)
 
 
 """
@@ -208,7 +217,7 @@ class PostgresConfig(BaseConfig):
     # --- Access ---
 
     # For local dev
-    password_local: str = Field(..., validation_alias="POSTGRES_PASSWORD_LOCAL")
+    # password_local: str = Field(..., validation_alias="POSTGRES_PASSWORD_LOCAL")
     # For Google App Engine
     password_secret_id: str | None = Field(
         None, validation_alias="DB_PASSWORD_SECRET_ID"
@@ -220,6 +229,9 @@ class PostgresConfig(BaseConfig):
         "local", validation_alias="POSTGRES_APP_ENGINE"
     )
 
+    # For local dev
+    password_local_var: str = "POSTGRES_PASSWORD_LOCAL"
+
     class Config(BaseConfig.Config):
         env_prefix = "POSTGRES_"
 
@@ -227,7 +239,7 @@ class PostgresConfig(BaseConfig):
     @property
     def password(self) -> str:
         """Fetches the password from Secret Manager or local environment."""
-        return self._resolve_secret(self.password_local, self.password_secret_id)
+        return self._resolve_secret(self.password_local_var, self.password_secret_id)
 
     def _build_sqlalchemy_url(self, use_placeholder_password: bool = False) -> URL:
         """Internal helper to construct the SQLAlchemy URL object."""

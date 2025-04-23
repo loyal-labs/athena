@@ -27,13 +27,15 @@ class TelegramBot:
         logger.debug("Initializing Telegram bot with .env config")
         self.data = TelegramBotData()
         self.api_token = config.bot_token
-        in_memory = shared_config.app_env == "local"
+
+        in_memory = shared_config.app_env == "cloud"
 
         self.client = Client(
             name=config.bot_session_name,
             api_id=config.api_id,
             api_hash=config.api_hash,
-            bot_token=config.bot_token,
+            bot_token=self.api_token,
+            workdir=str(config.bot_session_dir),
             in_memory=in_memory,
         )
         logger.debug("Client object initialized")

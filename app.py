@@ -8,6 +8,7 @@ import uvloop
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from src.api.router import api_router
 from src.containers import (
     Container,
     create_container,
@@ -94,11 +95,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(
     lifespan=lifespan,
-    title="Telemetree API",
-    description="Telemetree API endpoints.",
-    version="1.0.0",
+    title="Athena",
+    description="Athena API endpoints.",
+    version="0.2.0",
     root_path=shared_config.root_path,
 )
+
+# Include the API router
+app.include_router(api_router)
 
 # That's for the cors plugin
 app.add_middleware(
@@ -119,4 +123,5 @@ app.add_middleware(
 
 if __name__ == "__main__":
     # debug startup
+    uvicorn.run(app, port=8002)
     uvicorn.run(app, port=8002)

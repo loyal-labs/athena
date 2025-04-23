@@ -10,7 +10,7 @@ from pyrogram.types import Message
 from src.shared.event_bus import EventBus
 from src.shared.event_registry import MessageTopics
 
-logger = logging.getLogger("athena.telegram.messages")
+logger = logging.getLogger("athena.telegram.messages.handlers")
 
 
 class MessageHandlers:
@@ -36,10 +36,11 @@ class MessageHandlers:
         try:
             assert message.text
         except AssertionError:
-            logger.error("Message %s has no text", message.id)
+            logger.error("Message %s has no text, in filters", message.id)
             return False
 
         looking_for = ["@athena_tgbot", "афина", "athena"]
+        print(f"Checking message: {message}")
 
         # condition 1: Athena's mentioned in the beggining of the message
         if any(
@@ -73,6 +74,10 @@ class MessageHandlers:
         except AssertionError:
             logger.error("Message %s has no chat", message.id)
             return
+
+        print(f"Received message: {message}")
+
+        logger.debug("Received message: %s", message.text)
 
         await client.send_chat_action(message.chat.id, ChatAction.TYPING)
         await self.event_bus.request(

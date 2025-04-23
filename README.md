@@ -35,3 +35,29 @@ uv lock
 - Use `cz commit` after adding changed files w/ `github add .`
 - Use `git push --follow-tags` after to push the flags too.
 - Use `cz bump` for meaningful version update, it will handle the rest.
+
+## 2. Deploying
+- Initilize gcloud CLI and log into your account
+```
+gcloud init
+```
+- Deploying to `athena` stage
+```
+gcloud app deploy athena.yaml
+```
+
+### 2.1 Manage Dependencies 
+- Export `uv` dependencies to `requirements.txt` for gcloud
+```
+uv pip compile pyproject.toml -o requirements.txt
+```
+
+### 2.2 Key commands
+- Open deployed app
+```
+gcloud app browse
+```
+- Check logs
+```
+gcloud app logs tail -s athena
+```

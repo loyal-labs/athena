@@ -13,7 +13,7 @@ from src.telegram.messages.messages_schemas import (
     ResponseDependencies,
 )
 
-logger = logging.getLogger("athena.telegram.messages")
+logger = logging.getLogger("athena.telegram.messages.service")
 
 
 class MessagesService(BaseService):
@@ -29,34 +29,35 @@ class MessagesService(BaseService):
             event.extract_payload(event, RespondToMessagePayload),
         )
         client = payload.client
-        message = payload.message
+        og_message = payload.message
 
         try:
             logger.debug("Checking asserts")
-            assert message.chat
-            assert message.chat.username
-            assert message.from_user
-            assert message.text
+            assert og_message.chat
+            assert og_message.from_user
+            assert og_message.text
         except AssertionError:
             logger.error(
                 "Message %s has no chat or chat username",
-                message.id,
+                og_message.id,
             )
-            await message.reply_text("Error: Message has no chat or chat username")  # type: ignore
+            await og_message.reply_text("Error: Message has no chat or chat username")  # type: ignore
             return
 
-        chat_username = message.chat.username
-        await client.get_chat(chat_username)
+        chat_peer = og_message.chat.username or og_message.chat.id
+        chat_peer = cast(int | str, chat_peer)
 
-        message_id = message.id
+        await client.get_chat(chat_peer)
+
+        message_id = og_message.id
         # fetch 20 last messages from the chat
         message_ids = [message_id - i for i in range(20)]
         logger.debug("Fetching messages with ids: %s", message_ids)
-        messages = await client.get_messages(chat_username, message_ids=message_ids)
+        messages = await client.get_messages(chat_peer, message_ids=message_ids)
 
         # info
-        sender = message.from_user.first_name
-        query = message.text
+        sender = og_message.from_user.first_name
+        query = og_message.text
 
         gram_messages: list[GramMessage] = []
         if messages and isinstance(messages, list):
@@ -65,7 +66,7 @@ class MessagesService(BaseService):
                 try:
                     gram_messages.append(GramMessage.from_pyrogram_message(message))
                 except Exception as e:
-                    logger.exception(
+                    logger.warning(
                         "Error creating GramMessage from pyrogram messages, %s",
                         e,
                     )
@@ -76,18 +77,18 @@ class MessagesService(BaseService):
             last_messages=gram_messages,
             event_bus=self.event_bus,
             sender=sender,
-            message=message,
+            message=og_message,
         )
         logger.debug("Starting response agent")
         response = await self.start_response_agent(query, deps)
         logger.debug("Response agent finished")
 
-        logger.debug("Sending response to message %s", message.id)
-        await message.reply_text(  # type: ignore
+        logger.debug("Sending response to message %s", og_message.id)
+        await og_message.reply_text(  # type: ignore
             response,
             reply_markup=ForceReply(selective=True),
         )
-        logger.debug("Response sent to message %s", message.id)
+        logger.debug("Response sent to message %s", og_message.id)
         return
 
     async def start_response_agent(self, query: str, deps: ResponseDependencies) -> str:

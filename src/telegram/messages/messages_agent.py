@@ -10,7 +10,7 @@ from src.telegram.messages.messages_constants import (
 )
 from src.telegram.messages.messages_schemas import ResponseDependencies
 
-logger = logging.getLogger("athena.telegram.messages")
+logger = logging.getLogger("athena.telegram.messages.agent")
 
 
 #

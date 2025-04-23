@@ -25,8 +25,8 @@ class TelegramConfig(BaseSettings):
     """Settings for the Telegram bot."""
 
     # DEFAULT VALUES
-    bot_session_dir: Path = Path("src/now_the_game/storage")
-    bot_session_name: str = "bot_session"
+    bot_session_dir: Path = Path("tmp/")
+    bot_session_name: str = "athena_session"
 
     # GOOGLE CLOUD VARIABLES
     google_project_id: str | None = Field(None, validation_alias="GOOGLE_CLOUD_PROJECT")
@@ -122,6 +122,7 @@ class TelegramConfig(BaseSettings):
                     "Using TELEGRAM_BOT_TOKEN env var for local dev. "
                     "Set BOT_TOKEN_SECRET_ID for deployed environments."
                 )
+                print(f"Using local bot token: {local_bot_token}")
                 return local_bot_token
         if not self.google_project_id:
             # Auto-detect project ID
