@@ -98,7 +98,7 @@ app = FastAPI(
     title="Athena",
     description="Athena API endpoints.",
     version="0.2.0",
-    root_path=shared_config.root_path,
+    # root_path=shared_config.root_path,
 )
 
 # Include the API router

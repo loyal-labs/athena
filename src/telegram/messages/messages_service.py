@@ -51,7 +51,7 @@ class MessagesService(BaseService):
 
         message_id = og_message.id
         # fetch 20 last messages from the chat
-        message_ids = [message_id - i for i in range(20)]
+        message_ids = [message_id - i for i in range(5)]
         logger.debug("Fetching messages with ids: %s", message_ids)
         messages = await client.get_messages(chat_peer, message_ids=message_ids)
 

@@ -19,7 +19,7 @@ instance_class: F2
 entrypoint: uvicorn app:app --host 0.0.0.0 --port $PORT --loop uvloop
 
 automatic_scaling:
-  min_instances: 0 
+  min_instances: 1
   max_instances: 1 
 
 env_variables:
