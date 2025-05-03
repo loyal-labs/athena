@@ -1,8 +1,9 @@
 import json
 from typing import Any
 
+from src.shared.base import BaseService
+
 # Import models and schemas
-from src.telegraph.telegraph_exceptions import TelegraphAPIError
 from src.telegraph.telegraph_model import TelegraphModel
 from src.telegraph.telegraph_schemas import (
     Account,
@@ -13,7 +14,7 @@ from src.telegraph.telegraph_schemas import (
 )
 
 
-class TelegraphService:
+class TelegraphService(BaseService):
     """
     Provides a high-level interface to interact with the Telegraph API.
     Uses TelegraphModel for raw API calls and schemas for data validation/parsing.
@@ -31,7 +32,6 @@ class TelegraphService:
             )
 
     # --- Account Services ---
-
     def create_account(
         self,
         short_name: str,
