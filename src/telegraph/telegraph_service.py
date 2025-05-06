@@ -2,8 +2,6 @@ import json
 from typing import Any
 
 from src.shared.base import BaseService
-
-# Import models and schemas
 from src.telegraph.telegraph_model import TelegraphModel
 from src.telegraph.telegraph_schemas import (
     Account,
@@ -23,13 +21,6 @@ class TelegraphService(BaseService):
     def __init__(self, access_token: str | None = None):
         self._model = TelegraphModel()
         self.access_token = access_token
-
-    def _require_token(self):
-        """Raises an error if access_token is not set."""
-        if not self.access_token:
-            raise ValueError(
-                "An access_token is required for this operation but not set."
-            )
 
     # --- Account Services ---
     def create_account(
@@ -59,10 +50,14 @@ class TelegraphService(BaseService):
         author_url: str | None = None,
     ) -> Account:
         """
-        Updates information about the Telegraph account associated with the current access_token.
+        Updates information about the Telegraph account.
         Requires access_token to be set on the service instance.
         """
-        self._require_token()
+        try:
+            assert self.access_token is not None
+        except AssertionError as e:
+            raise ValueError("Access token is not set.") from e
+
         raw_result = self._model.edit_account_info(
             self.access_token, short_name, author_name, author_url
         )
@@ -70,10 +65,13 @@ class TelegraphService(BaseService):
 
     def get_account_info(self, fields: list[str] | None = None) -> Account:
         """
-        Gets information about the Telegraph account associated with the current access_token.
-        Requires access_token to be set on the service instance.
+        Gets information about the Telegraph account
         """
-        self._require_token()
+        try:
+            assert self.access_token is not None
+        except AssertionError as e:
+            raise ValueError("Access token is not set.") from e
+
         raw_result = self._model.get_account_info(self.access_token, fields)
         return Account.model_validate(raw_result)
 
@@ -83,7 +81,11 @@ class TelegraphService(BaseService):
         Updates the service's access_token on success.
         Requires access_token to be set on the service instance.
         """
-        self._require_token()
+        try:
+            assert self.access_token is not None
+        except AssertionError as e:
+            raise ValueError("Access token is not set.") from e
+
         raw_result = self._model.revoke_access_token(self.access_token)
         account = Account.model_validate(raw_result)
         if account.access_token:
@@ -95,7 +97,7 @@ class TelegraphService(BaseService):
     def create_page(
         self,
         title: str,
-        content: list[str | dict],  # Accept list of strings/dicts
+        content: dict[str, Any],
         author_name: str | None = None,
         author_url: str | None = None,
         return_content: bool = False,
@@ -107,31 +109,22 @@ class TelegraphService(BaseService):
         Args:
             title: Page title.
             content: List representing the page content (Array of Node).
-                     Each element should be a string or a dict matching NodeElement schema.
-                     Example: ["Hello", {"tag": "p", "children": ["World"]}]
             author_name: Optional author name.
             author_url: Optional author URL.
-            return_content: If true, the content field will be returned in the Page object.
+            return_content: If true, the content field will be returned.
 
         Returns:
             A Page object representing the created page.
         """
-        self._require_token()
-        # Validate and convert content list to JSON string required by model layer
         try:
-            # Use Pydantic to validate the structure first
-            validated_nodes = [
-                NodeElement.model_validate(n) if isinstance(n, dict) else n
-                for n in content
-            ]
-            content_json = json.dumps(validated_nodes)
-        except Exception as e:  # Catch Pydantic validation errors or others
-            raise ValueError(f"Invalid content structure: {e}") from e
+            assert self.access_token is not None
+        except AssertionError as e:
+            raise ValueError("Access token is not set.") from e
 
         raw_result = self._model.create_page(
             access_token=self.access_token,
             title=title,
-            content_json=content_json,
+            content=content,
             author_name=author_name,
             author_url=author_url,
             return_content=return_content,
@@ -152,7 +145,11 @@ class TelegraphService(BaseService):
         Requires access_token to be set on the service instance.
         See create_page for content format.
         """
-        self._require_token()
+        try:
+            assert self.access_token is not None
+        except AssertionError as e:
+            raise ValueError("Access token is not set.") from e
+
         try:
             validated_nodes = [
                 NodeElement.model_validate(n) if isinstance(n, dict) else n
@@ -173,11 +170,12 @@ class TelegraphService(BaseService):
         )
         return Page.model_validate(raw_result)
 
-    def get_page(self, path: str, return_content: bool = False) -> Page:
+    def get_page(self, path: str, return_content: bool = True) -> Page:
         """
         Gets a Telegraph page. Does not require an access token.
         """
         raw_result = self._model.get_page(path, return_content)
+        print(raw_result)
         return Page.model_validate(raw_result)
 
     def get_page_list(self, offset: int = 0, limit: int = 50) -> PageList:
@@ -186,7 +184,11 @@ class TelegraphService(BaseService):
         with the current access_token.
         Requires access_token to be set on the service instance.
         """
-        self._require_token()
+        try:
+            assert self.access_token is not None
+        except AssertionError as e:
+            raise ValueError("Access token is not set.") from e
+
         raw_result = self._model.get_page_list(self.access_token, offset, limit)
         return PageList.model_validate(raw_result)
 
@@ -199,7 +201,7 @@ class TelegraphService(BaseService):
         hour: int | None = None,
     ) -> PageViews:
         """
-        Gets the number of views for a Telegraph article. Does not require an access token.
+        Gets the number of views for a Telegraph article.
         """
         raw_result = self._model.get_views(path, year, month, day, hour)
         return PageViews.model_validate(raw_result)

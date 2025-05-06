@@ -1,4 +1,5 @@
 # schemas.py
+from enum import Enum
 from typing import Union
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
@@ -20,19 +21,14 @@ class NodeElement(BaseModel):
     )
     attrs: dict[str, str] | None = Field(
         None,
-        description="Attributes of the DOM element (e.g., {'href': '...', 'src': '...'}).",
+        description="Attributes of the DOM element ({'href': '...', 'src': '...'}).",
     )
     children: list[Node] | None = Field(
         None, description="List of child nodes (strings or NodeElements)."
     )
 
 
-# Resolve the forward reference
-# NodeElement.model_rebuild() # This is implicit in Pydantic v2 when defined this way
-
 # --- API Object Schemas ---
-
-
 class Account(BaseModel):
     """
     Represents a Telegraph account.
@@ -107,3 +103,10 @@ class PageViews(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     views: int = Field(..., description="Number of page views for the target page.")
+
+
+# --- Telegraph Utils ---
+class OutputFormat(str, Enum):
+    HTML_STRING = "html_string"
+    JSON_STRING = "json_string"
+    PYTHON_LIST = "python_list"

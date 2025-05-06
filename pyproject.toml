@@ -19,10 +19,13 @@ dependencies = [
     "google-generativeai>=0.8.5",
     "greenlet>=3.2.0",
     "kurigram>=2.2.1",
+    "lxml-html-clean>=0.4.2",
+    "markdown>=3.8",
     "orjson>=3.10.16",
     "pydantic>=2.11.3",
     "pydantic-ai>=0.1.3",
     "pydantic-settings>=2.9.1",
+    "pytest>=8.3.5",
     "sqlalchemy>=2.0.40",
     "sqlmodel>=0.0.24",
     "tgcrypto>=1.2.5",
@@ -58,31 +61,6 @@ ignore = []  # Add any rules you want to ignore here
 [tool.isort]
 profile = "black"
 
-# --- MyPy Configuration (Static Type Checker) ---
-[tool.mypy]
-python_version = "3.12"
-files = ["src"]
-strict = true
-
-# Core Strictness
-disallow_untyped_defs = true
-disallow_incomplete_defs = true
-check_untyped_defs = false
-disallow_untyped_calls = true
-
-# Warning Settings
-warn_redundant_casts = true
-warn_unused_ignores = false 
-warn_return_any = true
-warn_unreachable = true
-
-# Import Handling
-ignore_missing_imports = true
-
-# Presentation
-pretty = true
-show_error_codes = true
-
 # --- Pyright Configuration (Used by Pylance) ---
 [tool.pyright]
 include = ["src"]
@@ -100,3 +78,8 @@ exclude = [
 typeCheckingMode = "strict"
 reportMissingImports = true
 reportMissingTypeStubs = false
+
+# --- Pytest Configuration ---
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

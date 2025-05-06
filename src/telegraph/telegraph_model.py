@@ -126,7 +126,7 @@ class TelegraphModel:
         self,
         access_token: str,
         title: str,
-        content_json: str,  # Expect pre-formatted JSON string
+        content: dict[str, Any],
         author_name: str | None = None,
         author_url: str | None = None,
         return_content: bool = False,
@@ -134,7 +134,7 @@ class TelegraphModel:
         data = {
             "access_token": access_token,
             "title": title,
-            "content": content_json,
+            "content": content,
             "author_name": author_name,
             "author_url": author_url,
             "return_content": return_content,
