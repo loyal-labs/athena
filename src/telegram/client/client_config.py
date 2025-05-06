@@ -122,7 +122,6 @@ class TelegramConfig(BaseSettings):
                     "Using TELEGRAM_BOT_TOKEN env var for local dev. "
                     "Set BOT_TOKEN_SECRET_ID for deployed environments."
                 )
-                print(f"Using local bot token: {local_bot_token}")
                 return local_bot_token
         if not self.google_project_id:
             # Auto-detect project ID

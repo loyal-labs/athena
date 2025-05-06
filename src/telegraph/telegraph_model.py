@@ -116,7 +116,7 @@ class TelegraphModel:
         self,
         access_token: str,
         title: str,
-        content: dict[str, Any],
+        content: list[dict[str, Any]],
         author_name: str | None = None,
         author_url: str | None = None,
         return_content: bool = False,

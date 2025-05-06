@@ -40,7 +40,7 @@ class MessageHandlers:
             return False
 
         looking_for = ["@athena_tgbot", "афина", "athena"]
-        print(f"Checking message: {message}")
+        logger.debug("Checking message: %s", message)
 
         # condition 1: Athena's mentioned in the beggining of the message
         if any(
@@ -74,8 +74,6 @@ class MessageHandlers:
         except AssertionError:
             logger.error("Message %s has no chat", message.id)
             return
-
-        print(f"Received message: {message}")
 
         logger.debug("Received message: %s", message.text)
 

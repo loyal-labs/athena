@@ -1,5 +1,8 @@
 import json
-from typing import Any
+import logging
+from typing import Any, cast
+
+import markdown
 
 from src.shared.base import BaseService
 from src.telegraph.telegraph_model import TelegraphModel
@@ -9,7 +12,11 @@ from src.telegraph.telegraph_schemas import (
     Page,
     PageList,
     PageViews,
+    TelegraphConfig,
 )
+from src.telegraph.telegraph_utils import convert_html_to_telegraph_format
+
+logger = logging.getLogger("athena.telegraph.service")
 
 
 class TelegraphService(BaseService):
@@ -18,9 +25,21 @@ class TelegraphService(BaseService):
     Uses TelegraphModel for raw API calls and schemas for data validation/parsing.
     """
 
-    def __init__(self, access_token: str | None = None):
+    def __init__(self, config: TelegraphConfig):
         self._model = TelegraphModel()
-        self.access_token = access_token
+        self.access_token = config.access_token
+        self.author_name = config.author_name
+        self.short_name = config.short_name
+        self.author_url = config.author_url
+
+    async def prepare_markdown_content(self, content: str) -> list[dict[str, Any]]:
+        try:
+            html_content = markdown.markdown(content)
+            telegraph_content = convert_html_to_telegraph_format(html_content)
+            return cast(list[dict[str, Any]], telegraph_content)
+        except Exception as e:
+            logger.error("Error preparing markdown content: %s", e)
+            raise ValueError(f"Error preparing markdown content: {e}") from e
 
     # --- Account Services ---
     async def create_account(
@@ -95,11 +114,10 @@ class TelegraphService(BaseService):
         return account
 
     # --- Page Services ---
-
     async def create_page(
         self,
         title: str,
-        content: dict[str, Any],
+        content: str,
         author_name: str | None = None,
         author_url: str | None = None,
         return_content: bool = False,
@@ -123,12 +141,14 @@ class TelegraphService(BaseService):
         except AssertionError as e:
             raise ValueError("Access token is not set.") from e
 
+        prepared_content = await self.prepare_markdown_content(content)
+
         raw_result = await self._model.create_page(
             access_token=self.access_token,
             title=title,
-            content=content,
-            author_name=author_name,
-            author_url=author_url,
+            content=prepared_content,
+            author_name=author_name or self.author_name,
+            author_url=author_url or self.author_url,
             return_content=return_content,
         )
         return Page.model_validate(raw_result)
@@ -166,8 +186,8 @@ class TelegraphService(BaseService):
             path=path,
             title=title,
             content_json=content_json,
-            author_name=author_name,
-            author_url=author_url,
+            author_name=author_name or self.author_name,
+            author_url=author_url or self.author_url,
             return_content=return_content,
         )
         return Page.model_validate(raw_result)

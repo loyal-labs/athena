@@ -49,6 +49,8 @@ env_variables:
   API_BOT_TOKEN: 'telemetree-athena-api-token'
   # App Engine: Telemetree
   TELEMETREE_ENTERPRISE_SECRET_ID: 'telemetree-athena-enterprise-token'
+  # App Engine: Telegraph
+  TELEGRAPH_ACCESS_TOKEN: 'loyal-athena-telegraph-access-token'
 
 liveness_check:
   path: "/ping"
