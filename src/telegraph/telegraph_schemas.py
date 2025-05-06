@@ -4,6 +4,7 @@ from typing import Union
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, computed_field
 
 from src.shared.config import BaseConfig
+from src.shared.events import EventPayload
 
 
 # --- Config ---
@@ -138,3 +139,13 @@ class OutputFormat(str, Enum):
     HTML_STRING = "html_string"
     JSON_STRING = "json_string"
     PYTHON_LIST = "python_list"
+
+
+# --- Telegraph Payloads ---
+class CreatePagePayload(EventPayload):
+    title: str
+    content: str
+
+
+class GetPagePayload(EventPayload):
+    path: str

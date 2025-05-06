@@ -5,9 +5,13 @@ from typing import Any, cast
 import markdown
 
 from src.shared.base import BaseService
+from src.shared.event_bus import Event, EventBus
+from src.shared.event_registry import TelegraphPageTopics
 from src.telegraph.telegraph_model import TelegraphModel
 from src.telegraph.telegraph_schemas import (
     Account,
+    CreatePagePayload,
+    GetPagePayload,
     NodeElement,
     Page,
     PageList,
@@ -32,7 +36,8 @@ class TelegraphService(BaseService):
         self.short_name = config.short_name
         self.author_url = config.author_url
 
-    async def prepare_markdown_content(self, content: str) -> list[dict[str, Any]]:
+    # --- Private Methods ---
+    async def __prepare_markdown_content(self, content: str) -> list[dict[str, Any]]:
         try:
             html_content = markdown.markdown(content)
             telegraph_content = convert_html_to_telegraph_format(html_content)
@@ -40,6 +45,46 @@ class TelegraphService(BaseService):
         except Exception as e:
             logger.error("Error preparing markdown content: %s", e)
             raise ValueError(f"Error preparing markdown content: {e}") from e
+
+    # --- Event Handlers ---
+    @EventBus.subscribe(TelegraphPageTopics.CREATE_PAGE)
+    async def on_create_page(self, event: Event) -> Page:
+        """
+        Creates a new Telegraph page.
+
+        Args:
+            title: The title of the page.
+            content: The content of the page.
+
+        Returns:
+            A Page object representing the created page.
+        """
+
+        payload = cast(
+            CreatePagePayload, event.extract_payload(event, CreatePagePayload)
+        )
+        title = payload.title
+        content = payload.content
+
+        page = await self.create_page(title, content, return_content=True)
+        return page
+
+    @EventBus.subscribe(TelegraphPageTopics.GET_PAGE)
+    async def on_get_page(self, event: Event) -> Page:
+        """
+        Gets a Telegraph page.
+
+        Args:
+            path: The path of the page to get.
+
+        Returns:
+            A Page object representing the page.
+        """
+
+        payload = cast(GetPagePayload, event.extract_payload(event, GetPagePayload))
+        path = payload.path
+        page = await self.get_page(path, return_content=True)
+        return page
 
     # --- Account Services ---
     async def create_account(
@@ -141,7 +186,7 @@ class TelegraphService(BaseService):
         except AssertionError as e:
             raise ValueError("Access token is not set.") from e
 
-        prepared_content = await self.prepare_markdown_content(content)
+        prepared_content = await self.__prepare_markdown_content(content)
 
         raw_result = await self._model.create_page(
             access_token=self.access_token,
