@@ -15,5 +15,5 @@ class PostsModel:
             "offset_date": offset_date,
             "limit": limit,
         }
-        response = await http_client.get_request(url, params=params)
+        response = await http_client.request(url, params=params)
         return response

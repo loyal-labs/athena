@@ -1,8 +1,8 @@
 import json
-from typing import Any
+from typing import Any, cast
 
-import requests
-
+from src.shared.exceptions import HTTPError
+from src.shared.http import AsyncHttpClient
 from src.telegraph.telegraph_exceptions import TelegraphAPIError
 
 
@@ -13,8 +13,9 @@ class TelegraphModel:
     """
 
     BASE_URL = "https://api.telegra.ph"
+    http_client = AsyncHttpClient()
 
-    def _request(
+    async def _request(
         self,
         method_name: str,
         params: dict[str, Any] | None = None,
@@ -44,35 +45,27 @@ class TelegraphModel:
             url += f"/{path_param}"
 
         try:
-            if http_method == "POST":
-                response = requests.post(url, data=data)
-            else:  # Default to GET
-                response = requests.get(url, params=params)
+            response = await self.http_client.request(
+                url,
+                params=params,
+                data=data,
+                method=http_method,
+            )
+            response = cast(dict[str, Any], response)
 
-            response.raise_for_status()
-
-            try:
-                response_data = response.json()
-            except json.JSONDecodeError as e:
-                raise TelegraphAPIError(
-                    f"Failed to decode JSON response: {response.text}"
-                ) from e
-
-            if response_data.get("ok"):
-                return response_data.get(
+            if response.get("ok"):
+                return response.get(
                     "result", {}
                 )  # Return result or empty dict if missing
             else:
-                error_msg = response_data.get("error", "Unknown API error")
+                error_msg = response.get("error", "Unknown API error")
                 raise TelegraphAPIError(error_msg)
 
-        except requests.exceptions.RequestException as e:
-            # Re-raise network/HTTP errors for potential higher-level handling
+        except HTTPError as e:
             raise TelegraphAPIError(f"Network or HTTP error: {e}") from e
 
     # --- Account Methods ---
-
-    def create_account(
+    async def create_account(
         self,
         short_name: str,
         author_name: str | None = None,
@@ -85,11 +78,9 @@ class TelegraphModel:
         }
         # Filter out None values
         params = {k: v for k, v in params.items() if v is not None}
-        return self._request(
-            "createAccount", params=params, http_method="GET"
-        )  # Or POST
+        return await self._request("createAccount", params=params, http_method="GET")
 
-    def edit_account_info(
+    async def edit_account_info(
         self,
         access_token: str,
         short_name: str | None = None,
@@ -103,26 +94,25 @@ class TelegraphModel:
             "author_url": author_url,
         }
         params = {k: v for k, v in params.items() if v is not None}
-        return self._request(
-            "editAccountInfo", params=params, http_method="GET"
-        )  # Or POST
+        return await self._request("editAccountInfo", params=params, http_method="GET")
 
-    def get_account_info(
+    async def get_account_info(
         self, access_token: str, fields: list[str] | None = None
     ) -> dict[str, Any]:
         params = {"access_token": access_token}
         if fields:
             # API expects fields as a JSON array string
             params["fields"] = json.dumps(fields)
-        return self._request("getAccountInfo", params=params, http_method="GET")
+        return await self._request("getAccountInfo", params=params, http_method="GET")
 
-    def revoke_access_token(self, access_token: str) -> dict[str, Any]:
+    async def revoke_access_token(self, access_token: str) -> dict[str, Any]:
         params = {"access_token": access_token}
-        return self._request("revokeAccessToken", params=params, http_method="GET")
+        return await self._request(
+            "revokeAccessToken", params=params, http_method="GET"
+        )
 
     # --- Page Methods ---
-
-    def create_page(
+    async def create_page(
         self,
         access_token: str,
         title: str,
@@ -146,9 +136,9 @@ class TelegraphModel:
             data["return_content"] = str(data["return_content"]).lower()
 
         # Using POST is safer for potentially large content
-        return self._request("createPage", data=data, http_method="POST")
+        return await self._request("createPage", data=data, http_method="POST")
 
-    def edit_page(
+    async def edit_page(
         self,
         access_token: str,
         path: str,
@@ -171,15 +161,17 @@ class TelegraphModel:
             data["return_content"] = str(data["return_content"]).lower()
 
         # Using POST is safer for potentially large content
-        return self._request("editPage", path_param=path, data=data, http_method="POST")
+        return await self._request(
+            "editPage", path_param=path, data=data, http_method="POST"
+        )
 
-    def get_page(self, path: str, return_content: bool = False) -> dict[str, Any]:
+    async def get_page(self, path: str, return_content: bool = False) -> dict[str, Any]:
         params = {"return_content": str(return_content).lower()}
-        return self._request(
+        return await self._request(
             "getPage", path_param=path, params=params, http_method="GET"
         )
 
-    def get_page_list(
+    async def get_page_list(
         self, access_token: str, offset: int = 0, limit: int = 50
     ) -> dict[str, Any]:
         params = {
@@ -187,9 +179,9 @@ class TelegraphModel:
             "offset": offset,
             "limit": limit,
         }
-        return self._request("getPageList", params=params, http_method="GET")
+        return await self._request("getPageList", params=params, http_method="GET")
 
-    def get_views(
+    async def get_views(
         self,
         path: str,
         year: int | None = None,
@@ -204,6 +196,6 @@ class TelegraphModel:
             "hour": hour,
         }
         params = {k: v for k, v in params.items() if v is not None}
-        return self._request(
+        return await self._request(
             "getViews", path_param=path, params=params, http_method="GET"
         )

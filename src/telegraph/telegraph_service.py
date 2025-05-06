@@ -23,7 +23,7 @@ class TelegraphService(BaseService):
         self.access_token = access_token
 
     # --- Account Services ---
-    def create_account(
+    async def create_account(
         self,
         short_name: str,
         author_name: str | None = None,
@@ -35,7 +35,9 @@ class TelegraphService(BaseService):
         Returns:
             An Account object including the new access_token.
         """
-        raw_result = self._model.create_account(short_name, author_name, author_url)
+        raw_result = await self._model.create_account(
+            short_name, author_name, author_url
+        )
         account = Account.model_validate(raw_result)
         if account.access_token:
             self.access_token = (
@@ -43,7 +45,7 @@ class TelegraphService(BaseService):
             )  # Store token for future use by this instance
         return account
 
-    def edit_account_info(
+    async def edit_account_info(
         self,
         short_name: str | None = None,
         author_name: str | None = None,
@@ -58,12 +60,12 @@ class TelegraphService(BaseService):
         except AssertionError as e:
             raise ValueError("Access token is not set.") from e
 
-        raw_result = self._model.edit_account_info(
+        raw_result = await self._model.edit_account_info(
             self.access_token, short_name, author_name, author_url
         )
         return Account.model_validate(raw_result)
 
-    def get_account_info(self, fields: list[str] | None = None) -> Account:
+    async def get_account_info(self, fields: list[str] | None = None) -> Account:
         """
         Gets information about the Telegraph account
         """
@@ -72,10 +74,10 @@ class TelegraphService(BaseService):
         except AssertionError as e:
             raise ValueError("Access token is not set.") from e
 
-        raw_result = self._model.get_account_info(self.access_token, fields)
+        raw_result = await self._model.get_account_info(self.access_token, fields)
         return Account.model_validate(raw_result)
 
-    def revoke_access_token(self) -> Account:
+    async def revoke_access_token(self) -> Account:
         """
         Revokes the current access_token and generates a new one.
         Updates the service's access_token on success.
@@ -86,7 +88,7 @@ class TelegraphService(BaseService):
         except AssertionError as e:
             raise ValueError("Access token is not set.") from e
 
-        raw_result = self._model.revoke_access_token(self.access_token)
+        raw_result = await self._model.revoke_access_token(self.access_token)
         account = Account.model_validate(raw_result)
         if account.access_token:
             self.access_token = account.access_token  # Update stored token
@@ -94,7 +96,7 @@ class TelegraphService(BaseService):
 
     # --- Page Services ---
 
-    def create_page(
+    async def create_page(
         self,
         title: str,
         content: dict[str, Any],
@@ -121,7 +123,7 @@ class TelegraphService(BaseService):
         except AssertionError as e:
             raise ValueError("Access token is not set.") from e
 
-        raw_result = self._model.create_page(
+        raw_result = await self._model.create_page(
             access_token=self.access_token,
             title=title,
             content=content,
@@ -131,7 +133,7 @@ class TelegraphService(BaseService):
         )
         return Page.model_validate(raw_result)
 
-    def edit_page(
+    async def edit_page(
         self,
         path: str,
         title: str,
@@ -159,7 +161,7 @@ class TelegraphService(BaseService):
         except Exception as e:
             raise ValueError(f"Invalid content structure: {e}") from e
 
-        raw_result = self._model.edit_page(
+        raw_result = await self._model.edit_page(
             access_token=self.access_token,
             path=path,
             title=title,
@@ -170,15 +172,14 @@ class TelegraphService(BaseService):
         )
         return Page.model_validate(raw_result)
 
-    def get_page(self, path: str, return_content: bool = True) -> Page:
+    async def get_page(self, path: str, return_content: bool = True) -> Page:
         """
         Gets a Telegraph page. Does not require an access token.
         """
-        raw_result = self._model.get_page(path, return_content)
-        print(raw_result)
+        raw_result = await self._model.get_page(path, return_content)
         return Page.model_validate(raw_result)
 
-    def get_page_list(self, offset: int = 0, limit: int = 50) -> PageList:
+    async def get_page_list(self, offset: int = 0, limit: int = 50) -> PageList:
         """
         Gets a list of pages belonging to the Telegraph account associated
         with the current access_token.
@@ -189,10 +190,10 @@ class TelegraphService(BaseService):
         except AssertionError as e:
             raise ValueError("Access token is not set.") from e
 
-        raw_result = self._model.get_page_list(self.access_token, offset, limit)
+        raw_result = await self._model.get_page_list(self.access_token, offset, limit)
         return PageList.model_validate(raw_result)
 
-    def get_views(
+    async def get_views(
         self,
         path: str,
         year: int | None = None,
@@ -203,5 +204,5 @@ class TelegraphService(BaseService):
         """
         Gets the number of views for a Telegraph article.
         """
-        raw_result = self._model.get_views(path, year, month, day, hour)
+        raw_result = await self._model.get_views(path, year, month, day, hour)
         return PageViews.model_validate(raw_result)
