@@ -6,14 +6,9 @@ from typing import Any
 import aiohttp
 from aiohttp import ClientTimeout
 
+from src.shared.exceptions import HTTPError
+
 logger = logging.getLogger("athena.shared.http")
-
-
-class HTTPError(Exception):
-    def __init__(self, status: int, message: str):
-        self.status = status
-        self.message = message
-        super().__init__(f"HTTP error: {status} - {message}")
 
 
 class AsyncHttpClient:
