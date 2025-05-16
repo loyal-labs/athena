@@ -43,7 +43,7 @@ gcloud init
 ```
 - Deploying to `athena` stage
 ```
-gcloud app deploy athena.yaml --project=gen-lang-client-0674779185
+gcloud app deploy athena.yaml 
 ```
 
 ### 2.1 Manage Dependencies 
