@@ -200,6 +200,8 @@ idna==3.10
     #   yarl
 importlib-metadata==8.6.1
     # via opentelemetry-api
+iniconfig==2.1.0
+    # via pytest
 jinja2==3.1.6
     # via commitizen
 jiter==0.9.0
@@ -216,6 +218,12 @@ logfire-api==3.14.0
     # via
     #   pydantic-evals
     #   pydantic-graph
+lxml==5.4.0
+    # via lxml-html-clean
+lxml-html-clean==0.4.2
+    # via athena (pyproject.toml)
+markdown==3.8
+    # via athena (pyproject.toml)
 markdown-it-py==3.0.0
     # via rich
 markupsafe==3.0.2
@@ -244,6 +252,9 @@ packaging==25.0
     #   google-cloud-aiplatform
     #   google-cloud-bigquery
     #   huggingface-hub
+    #   pytest
+pluggy==1.6.0
+    # via pytest
 prompt-toolkit==3.0.51
     # via
     #   pydantic-ai-slim
@@ -320,6 +331,12 @@ pyparsing==3.2.3
     # via httplib2
 pysocks==1.7.1
     # via kurigram
+pytest==8.3.5
+    # via
+    #   athena (pyproject.toml)
+    #   pytest-asyncio
+pytest-asyncio==0.26.0
+    # via athena (pyproject.toml)
 python-dateutil==2.9.0.post0
     # via
     #   botocore
