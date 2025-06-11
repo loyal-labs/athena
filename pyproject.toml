@@ -18,7 +18,7 @@ dependencies = [
     "google-cloud-secret-manager>=2.23.3",
     "google-generativeai>=0.8.5",
     "greenlet>=3.2.0",
-    "kurigram>=2.2.1",
+    "kurigram",
     "lxml-html-clean>=0.4.2",
     "markdown>=3.8",
     "orjson>=3.10.16",
@@ -84,3 +84,6 @@ reportMissingTypeStubs = false
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+
+[tool.uv.sources]
+kurigram = { url = "https://github.com/KurimuzonAkuma/pyrogram/archive/565c9a1a7f20b81a6532f2e70a1730c20e6be8e4.zip" }

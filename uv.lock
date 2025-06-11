@@ -193,7 +193,7 @@ requires-dist = [
     { name = "google-cloud-secret-manager", specifier = ">=2.23.3" },
     { name = "google-generativeai", specifier = ">=0.8.5" },
     { name = "greenlet", specifier = ">=3.2.0" },
-    { name = "kurigram", specifier = ">=2.2.1" },
+    { name = "kurigram", url = "https://github.com/KurimuzonAkuma/pyrogram/archive/565c9a1a7f20b81a6532f2e70a1730c20e6be8e4.zip" },
     { name = "lxml-html-clean", specifier = ">=0.4.2" },
     { name = "markdown", specifier = ">=3.8" },
     { name = "orjson", specifier = ">=3.10.16" },
@@ -1100,16 +1100,33 @@ wheels = [
 
 [[package]]
 name = "kurigram"
-version = "2.2.1"
-source = { registry = "https://pypi.org/simple" }
+version = "2.2.4"
+source = { url = "https://github.com/KurimuzonAkuma/pyrogram/archive/565c9a1a7f20b81a6532f2e70a1730c20e6be8e4.zip" }
 dependencies = [
     { name = "pyaes" },
     { name = "pysocks" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f2/ac/f95f2a6dd1634224a31b7a0eb218e6181ac38c03363956b2bcd7bac7c0b0/kurigram-2.2.1.tar.gz", hash = "sha256:63fae5471d3824d5e08188180edf21ecfe13ed1bb53504308d0015469e4c9581", size = 527783 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/21/5f/0ea1fb36596ed756b122212e34d1786c96adf4ee9a3f5532c9d3f6833812/kurigram-2.2.1-py3-none-any.whl", hash = "sha256:94c9f23ee5cd2a868a557929b3ecf24fb4ff530a7f0a0f633676db2391fc9545", size = 4792260 },
+sdist = { hash = "sha256:f40b0022217eb287d1f9180b878d7d7ddba1e93e800990b40fdc2b3cac37d377" }
+
+[package.metadata]
+requires-dist = [
+    { name = "furo", marker = "extra == 'docs'", specifier = "<=2024.8.8" },
+    { name = "hatch", marker = "extra == 'dev'", specifier = "<=1.7.0" },
+    { name = "keyring", marker = "extra == 'dev'", specifier = "<=25.1.0" },
+    { name = "pyaes", specifier = "<=1.6.1" },
+    { name = "pygments", marker = "extra == 'docs'", specifier = "<=2.19.1" },
+    { name = "pysocks", specifier = "<=1.7.1" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = "<=7.4.3" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = "<=0.21.1" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = "<=4.1.0" },
+    { name = "sphinx", marker = "extra == 'docs'", specifier = "<=8.2.3" },
+    { name = "sphinx-autobuild", marker = "extra == 'docs'", specifier = "<=2024.10.3" },
+    { name = "sphinx-copybutton", marker = "extra == 'docs'", specifier = "<=0.5.2" },
+    { name = "tgcrypto", marker = "extra == 'fast'", specifier = "<=1.2.5" },
+    { name = "twine", marker = "extra == 'dev'", specifier = "<=4.0.2" },
+    { name = "uvloop", marker = "(sys_platform == 'darwin' and extra == 'fast') or (sys_platform == 'linux' and extra == 'fast')", specifier = "<=0.21.0" },
 ]
+provides-extras = ["dev", "docs", "fast"]
 
 [[package]]
 name = "logfire-api"
