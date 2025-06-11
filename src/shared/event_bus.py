@@ -14,7 +14,6 @@ from enum import Enum
 from inspect import getmembers, isawaitable, ismethod
 from typing import Any, TypeVar
 
-from src.shared.config import SharedConfig
 from src.shared.events import Event
 
 logger = logging.getLogger("athena.base-event-bus")
@@ -206,10 +205,3 @@ class EventBus(EventBusInterface):
                     obj.__class__.__name__,
                     topic,
                 )
-
-
-def get_event_bus(config_obj: SharedConfig) -> EventBus | EventBusInterface:
-    if config_obj.event_bus == "local":
-        return EventBus()
-    else:
-        raise ValueError(f"Unsupported event bus type: {config_obj.event_bus}")

@@ -16,7 +16,6 @@ from src.telemetree.posts.posts_schemas import (
     NewsPostsInputPayload,
     Output,
 )
-from src.telemetree.shared.telemetree_config import TelemetreeConfig
 from src.telemetree.shared.telemetree_endpoints import (
     DATALAKE_ENDPOINT,
     GET_POSTS_ENDPOINT,
@@ -26,8 +25,7 @@ logger = logging.getLogger("athena.telemetree.posts")
 
 
 class PostsService(BaseService):
-    def __init__(self, config: TelemetreeConfig):
-        self.config = config
+    def __init__(self):
         self.http_client = AsyncHttpClient()
 
     def __calculate_offset_date(self, offset_days: int) -> str:

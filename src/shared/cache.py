@@ -10,8 +10,6 @@ from typing import Any, TypeVar, cast
 import orjson
 from diskcache import Cache  # type: ignore
 
-from src.shared.config import shared_config
-
 logger = logging.getLogger("athena.cache")
 
 # Type variables for better type safety
@@ -27,10 +25,8 @@ def get_disk_cache() -> Cache:
     global _cache_instance
     if _cache_instance is None:
         # Explicitly use the /tmp directory which is usually writable
-        if shared_config.app_env == "cloud":
-            cache_dir = Path("/tmp") / ".cache"
-        else:
-            cache_dir = Path(__file__).parent.parent.parent / "tmp" / ".cache"
+
+        cache_dir = Path(__file__).parent.parent.parent / "tmp" / ".cache"
         logger.info("Using cache directory: %s", cache_dir)
 
         # Ensure cache directory exists

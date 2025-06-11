@@ -1,5 +1,6 @@
 import json
 import logging
+from enum import Enum
 from typing import Any, cast
 
 import markdown
@@ -7,6 +8,7 @@ import markdown
 from src.shared.base import BaseService
 from src.shared.event_bus import Event, EventBus
 from src.shared.event_registry import TelegraphPageTopics
+from src.shared.secrets import OnePasswordManager
 from src.telegraph.telegraph_model import TelegraphModel
 from src.telegraph.telegraph_schemas import (
     Account,
@@ -16,11 +18,17 @@ from src.telegraph.telegraph_schemas import (
     Page,
     PageList,
     PageViews,
-    TelegraphConfig,
 )
 from src.telegraph.telegraph_utils import convert_html_to_telegraph_format
 
 logger = logging.getLogger("athena.telegraph.service")
+
+
+class TelegraphEnvFields(str, Enum):
+    ACCESS_TOKEN = "TELEGRPAH_ACCESS_TOKEN"
+    AUTHOR_NAME = "TELEGRPAH_AUTHOR_NAME"
+    SHORT_NAME = "TELEGRPAH_SHORT_NAME"
+    AUTHOR_URL = "TELEGRPAH_AUTHOR_URL"
 
 
 class TelegraphService(BaseService):
@@ -29,14 +37,78 @@ class TelegraphService(BaseService):
     Uses TelegraphModel for raw API calls and schemas for data validation/parsing.
     """
 
-    def __init__(self, config: TelegraphConfig):
+    # 1Password Constants
+    default_item_name = "ATHENA_TELEGRAPH"
+
+    def __init__(self):
         self._model = TelegraphModel()
-        self.access_token = config.access_token
-        self.author_name = config.author_name
-        self.short_name = config.short_name
-        self.author_url = config.author_url
+        self.access_token = None
+        self.author_name = None
+        self.short_name = None
+        self.author_url = None
+
+    @classmethod
+    async def create(cls, secrets_manager: OnePasswordManager):
+        """
+        Creates a new instance of the TelegraphService.
+
+        Args:
+            secrets_manager: The secrets manager to use.
+
+        Returns:
+            TelegraphService: A new instance of the TelegraphService.
+        """
+        assert secrets_manager is not None, "Secrets manager is not set"
+        assert isinstance(secrets_manager, OnePasswordManager), (
+            "Secrets manager is not an instance of OnePasswordManager"
+        )
+
+        self = cls()
+        await self.__init_service(secrets_manager)
+        await self.__post_init_checks()
+
+        return self
 
     # --- Private Methods ---
+    async def __post_init_checks(self):
+        assert self.access_token is not None, "Access token is not set"
+        assert self.author_name is not None, "Author name is not set"
+        assert self.short_name is not None, "Short name is not set"
+        assert self.author_url is not None, "Author URL is not set"
+
+    async def __init_service(self, secrets_manager: OnePasswordManager):
+        assert secrets_manager is not None, "Secrets manager is not set"
+        assert isinstance(secrets_manager, OnePasswordManager), (
+            "Secrets manager is not an instance of OnePasswordManager"
+        )
+        assert secrets_manager.client is not None, "Secrets manager client is not set"
+
+        logger.debug("Fetching Telegraph environment variables")
+
+        self.author_name = await secrets_manager.get_secret(
+            secrets_manager.default_vault,
+            self.default_item_name,
+            TelegraphEnvFields.AUTHOR_NAME.value,
+        )
+
+        self.short_name = await secrets_manager.get_secret(
+            secrets_manager.default_vault,
+            self.default_item_name,
+            TelegraphEnvFields.SHORT_NAME.value,
+        )
+
+        self.author_url = await secrets_manager.get_secret(
+            secrets_manager.default_vault,
+            self.default_item_name,
+            TelegraphEnvFields.AUTHOR_URL.value,
+        )
+
+        self.access_token = await secrets_manager.get_secret(
+            secrets_manager.default_vault,
+            self.default_item_name,
+            TelegraphEnvFields.ACCESS_TOKEN.value,
+        )
+
     async def __prepare_markdown_content(self, content: str) -> list[dict[str, Any]]:
         try:
             html_content = markdown.markdown(content)

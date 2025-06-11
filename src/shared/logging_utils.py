@@ -2,8 +2,6 @@ import logging
 
 import colorlog
 
-from src.shared.config import shared_config
-
 LOG_COLORS = {
     "DEBUG": "cyan",
     "INFO": "green",
@@ -37,7 +35,7 @@ def configure_logging() -> None:
     logging.getLogger("clickhouse_connect").setLevel(logging.INFO)
 
     logging.basicConfig(
-        level=shared_config.log_level,
+        level=logging.DEBUG,
         format="%(levelname)-8s | %(asctime)s | %(name)s:%(funcName)s:%(lineno)d | %(message)s",  # noqa: E501
         datefmt=date_format,
         handlers=handlers,

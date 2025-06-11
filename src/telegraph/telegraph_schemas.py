@@ -1,37 +1,9 @@
 from enum import Enum
 from typing import Union
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, computed_field
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
-from src.shared.config import BaseConfig
 from src.shared.events import EventPayload
-
-
-# --- Config ---
-class TelegraphConfig(BaseConfig):
-    # --- Constants ---
-    author_name: str = "Loyal Athena"
-    short_name: str = "Loyal Athena"
-    author_url: str = "https://t.me/athena_tgbot"
-
-    # for Google App Engine
-    access_token_secret_id: str | None = Field(
-        None, validation_alias="TELEGRAPH_ACCESS_TOKEN_SECRET_ID"
-    )
-
-    # for local dev
-    access_token_local_var: str = "TELEGRAPH_ACCESS_TOKEN"
-
-    class Config(BaseConfig.Config):
-        env_prefix = "TELEGRAPH_"
-
-    @computed_field(return_type=str)
-    @property
-    def access_token(self) -> str:
-        return self._resolve_secret(
-            self.access_token_local_var, self.access_token_secret_id
-        )
-
 
 # --- Node Handling ---
 Node = Union[str, "NodeElement"]

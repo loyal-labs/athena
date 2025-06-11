@@ -14,38 +14,40 @@ from src.shared.config import PostgresConfig
 from src.shared.database import Database
 from src.shared.event_bus import EventBus
 from src.shared.logging_utils import configure_logging
+from src.shared.secrets import OnePasswordManager
 from src.shared.types import SessionFactory
 from src.shared.uow import UnitOfWork
-from src.telegram.client.client_config import TelegramConfig
-from src.telegram.client.client_object import TelegramBot
+from src.telegram.client.telegram_client import Telegram
 from src.telegram.messages.messages_handlers import MessageHandlers
 from src.telegram.messages.messages_service import MessagesService
 from src.telemetree.posts.posts_service import PostsService
-from src.telemetree.shared.telemetree_config import TelemetreeConfig
 
 logger = logging.getLogger("athena.containers")
 
 
 class Container(containers.DeclarativeContainer):
-    # --- DATABASE ---
-    postgres_config = providers.Factory(
-        PostgresConfig,
-    )
-    db = providers.Singleton(
-        Database,
-        db_config=postgres_config,
-    )
+    # -- SECRETS --
+    secrets_manager = providers.Singleton(OnePasswordManager)
 
-    # -- Database Session --
-    db_session_provider = providers.Factory[SessionFactory](
-        lambda db_instance: db_instance.session,  # type: ignore
-        db_instance=db,
-    )
-    # -- Unit of Work --
-    uow_factory = providers.Factory(
-        UnitOfWork,
-        session_factory=db_session_provider,
-    )
+    # # --- DATABASE ---
+    # postgres_config = providers.Factory(
+    #     PostgresConfig,
+    # )
+    # db = providers.Singleton(
+    #     Database,
+    #     db_config=postgres_config,
+    # )
+
+    # # -- Database Session --
+    # db_session_provider = providers.Factory[SessionFactory](
+    #     lambda db_instance: db_instance.session,  # type: ignore
+    #     db_instance=db,
+    # )
+    # # -- Unit of Work --
+    # uow_factory = providers.Factory(
+    #     UnitOfWork,
+    #     session_factory=db_session_provider,
+    # )
 
     # -- Disk Cache --
     disk_cache_instance = providers.Singleton(get_disk_cache)
@@ -57,8 +59,7 @@ class Container(containers.DeclarativeContainer):
     observability = providers.Factory(configure_logging)
 
     # -- Telegram --
-    telegram_config = providers.Factory(TelegramConfig)
-    telegram_object = providers.Singleton(TelegramBot, config=telegram_config)
+    telegram_object = providers.Singleton(Telegram)
     telegram_client = providers.Factory[Client](
         lambda telegram_bot: telegram_bot.get_client(),  # type: ignore
         telegram_bot=telegram_object,
@@ -69,9 +70,8 @@ class Container(containers.DeclarativeContainer):
     model_object = providers.Singleton(VertexLLM, config=model_config)
 
     # -- Telemetree Integrations --
-    telemetree_config = providers.Factory(TelemetreeConfig)
     message_handlers = providers.Factory(MessageHandlers, event_bus=event_bus)
-    posts_service = providers.Factory(PostsService, config=telemetree_config)
+    posts_service = providers.Factory(PostsService)
     messages_service = providers.Factory(MessagesService, event_bus=event_bus)
 
 
@@ -137,21 +137,34 @@ def create_container() -> Container:
     return container
 
 
-async def init_service(container: Container, name: str) -> Any:
+async def init_service(
+    container: Container,
+    name: str,
+    secrets_manager: OnePasswordManager | None = None,
+) -> Any:
     """
     Initializes a service.
     """
     service_dict = {
         "observability": container.observability,
-        "db": container.db,
-        "telegram_object": container.telegram_object,
+        # "db": container.db,
         "disk_cache_instance": container.disk_cache_instance,
+        "telegram_object": container.telegram_object,
         "event_bus": container.event_bus,
     }
+
+    assert name is not None, "Service name is not set"
+    assert name in service_dict, f"Service {name} not found in container"
+
     try:
         logger.debug("Initializing service %s", name)
         service = service_dict[name]()
         logger.debug("Initialized service %s", name)
+
+        if isinstance(service, Telegram):
+            assert secrets_manager is not None, "Secrets manager is not set"
+            service = await service.create(secrets_manager)
+
         return service
     except KeyError as e:
         raise ValueError("Service %s not found in container", name) from e
