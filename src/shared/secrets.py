@@ -31,8 +31,8 @@ class OnePasswordManager:
         """
         load_dotenv()
 
-        service_token = os.getenv("ONEPASS_SERVICE_TOKEN", "")
-        assert service_token is not None, "ONEPASS_SERVICE_TOKEN is not set"
+        service_token = os.getenv("OP_SERVICE_ACCOUNT_TOKEN", "")
+        assert service_token is not None, "OP_SERVICE_ACCOUNT_TOKEN is not set"
 
         self = cls()
 
@@ -44,7 +44,7 @@ class OnePasswordManager:
         self,
         service_token: str,
     ) -> Client:
-        assert service_token is not None, "ONEPASS_SERVICE_TOKEN is not set"
+        assert service_token is not None, "OP_SERVICE_ACCOUNT_TOKEN is not set"
 
         client = await Client.authenticate(
             auth=service_token,
