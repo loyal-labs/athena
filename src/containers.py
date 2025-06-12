@@ -10,8 +10,7 @@ from pyrogram.client import Client
 from src.shared.base import BaseService
 from src.shared.base_llm import VertexConfig, VertexLLM
 from src.shared.cache import get_disk_cache
-from src.shared.config import PostgresConfig
-from src.shared.database import Database
+from src.shared.database import PostgreSQL
 from src.shared.event_bus import EventBus
 from src.shared.logging_utils import configure_logging
 from src.shared.secrets import OnePasswordManager
@@ -30,24 +29,21 @@ class Container(containers.DeclarativeContainer):
     secrets_manager = providers.Singleton(OnePasswordManager)
 
     # # --- DATABASE ---
-    # postgres_config = providers.Factory(
-    #     PostgresConfig,
-    # )
-    # db = providers.Singleton(
-    #     Database,
-    #     db_config=postgres_config,
-    # )
 
-    # # -- Database Session --
-    # db_session_provider = providers.Factory[SessionFactory](
-    #     lambda db_instance: db_instance.session,  # type: ignore
-    #     db_instance=db,
-    # )
-    # # -- Unit of Work --
-    # uow_factory = providers.Factory(
-    #     UnitOfWork,
-    #     session_factory=db_session_provider,
-    # )
+    db = providers.Singleton(
+        PostgreSQL,
+    )
+
+    # -- Database Session --
+    db_session_provider = providers.Factory[SessionFactory](
+        lambda db_instance: db_instance.session,  # type: ignore
+        db_instance=db,
+    )
+    # -- Unit of Work --
+    uow_factory = providers.Factory(
+        UnitOfWork,
+        session_factory=db_session_provider,
+    )
 
     # -- Disk Cache --
     disk_cache_instance = providers.Singleton(get_disk_cache)
@@ -147,7 +143,7 @@ async def init_service(
     """
     service_dict = {
         "observability": container.observability,
-        # "db": container.db,
+        "db": container.db,
         "disk_cache_instance": container.disk_cache_instance,
         "telegram_object": container.telegram_object,
         "event_bus": container.event_bus,
@@ -162,6 +158,10 @@ async def init_service(
         logger.debug("Initialized service %s", name)
 
         if isinstance(service, Telegram):
+            assert secrets_manager is not None, "Secrets manager is not set"
+            service = await service.create(secrets_manager)
+
+        elif isinstance(service, PostgreSQL):
             assert secrets_manager is not None, "Secrets manager is not set"
             service = await service.create(secrets_manager)
 
