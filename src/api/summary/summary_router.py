@@ -8,13 +8,13 @@ from src.api.summary.summary_schemas import ChatSummary
 router = APIRouter()
 
 
-@router.get("/", response_model=ChatSummary)
-async def get_chat_summary() -> ChatSummary:
+@router.get("/", response_model=list[ChatSummary])
+async def get_chat_summary() -> list[ChatSummary]:
     """
     Get the chat summary for the current user.
     """
     path = (
-        Path(__file__).parent.parent.parent
+        Path(__file__).parent.parent.parent.parent
         / "tests"
         / "api"
         / "fixtures"
@@ -22,4 +22,6 @@ async def get_chat_summary() -> ChatSummary:
     )
 
     with open(path) as f:
-        return ChatSummary(**json.load(f))
+        mocked_data = json.load(f)
+
+    return [ChatSummary(**chat_data) for chat_data in mocked_data]

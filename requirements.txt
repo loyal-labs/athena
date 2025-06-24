@@ -212,7 +212,7 @@ jmespath==1.0.1
     # via
     #   boto3
     #   botocore
-kurigram==2.2.1
+kurigram @ https://github.com/KurimuzonAkuma/pyrogram/archive/565c9a1a7f20b81a6532f2e70a1730c20e6be8e4.zip
     # via athena (pyproject.toml)
 logfire-api==3.14.0
     # via
@@ -240,6 +240,8 @@ multidict==6.4.3
     #   yarl
 numpy==2.2.5
     # via shapely
+onepassword-sdk==0.3.1
+    # via athena (pyproject.toml)
 openai==1.75.0
     # via pydantic-ai-slim
 opentelemetry-api==1.32.1
@@ -301,6 +303,7 @@ pydantic==2.11.3
     #   groq
     #   mcp
     #   mistralai
+    #   onepassword-sdk
     #   openai
     #   pydantic-ai-slim
     #   pydantic-evals
