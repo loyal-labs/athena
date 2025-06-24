@@ -55,7 +55,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         logger.debug("Initializing services")
         # --- Telegram ---
         message_handlers = container.message_handlers()
-        await telegram.start(handlers=message_handlers.message_handlers)  # type: ignore
+        # await telegram.start(handlers=message_handlers.message_handlers)  # type: ignore
 
         # --- Database ---
 
@@ -120,5 +120,4 @@ app.add_middleware(
 
 if __name__ == "__main__":
     # debug startup
-    uvicorn.run(app, port=8002)
     uvicorn.run(app, port=8002)

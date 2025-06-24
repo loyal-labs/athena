@@ -4,7 +4,6 @@ import pytest
 from dotenv import load_dotenv
 from pydantic import HttpUrl
 
-from src.telegraph.telegraph_schemas import TelegraphConfig
 from src.telegraph.telegraph_service import TelegraphService
 
 PATH_TO_FIXTURES = "tests/telegraph/fixtures"
@@ -13,8 +12,7 @@ PATH_TO_FIXTURES = "tests/telegraph/fixtures"
 @pytest.fixture
 def telegraph_service():
     load_dotenv()
-    config = TelegraphConfig(access_token_secret_id=None)
-    return TelegraphService(config)
+    return TelegraphService()
 
 
 @pytest.mark.asyncio

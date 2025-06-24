@@ -1,0 +1,183 @@
+[
+  {
+    "name": "StartupHub Solana",
+    "profile_picture": "https://github.com/shadcn.png",
+    "chat_type": "group",
+    "topics": [
+      {
+        "topic": "Product Development Strategy",
+        "date": "2024-06-24T14:30:00",
+        "points": [
+          {
+            "name": "John Doe",
+            "profile_picture": "https://github.com/leerob.png",
+            "summary": "Proposed switching to agile sprints for faster MVP delivery"
+          },
+          {
+            "name": "Jane Doe",
+            "profile_picture": "https://github.com/shadcn.png",
+            "summary": "Shared metrics showing 40% productivity increase with paired programming"
+          },
+          {
+            "name": "Jane Doe",
+            "profile_picture": "https://github.com/shadcn.png",
+            "summary": "Suggested implementing weekly user feedback sessions"
+          }
+        ]
+      },
+      {
+        "topic": "Funding Round Preparation",
+        "date": "2024-06-24T16:15:00",
+        "points": [
+          {
+            "name": "John Doe",
+            "profile_picture": "https://github.com/leerob.png",
+            "summary": "Outlined key metrics investors look for in Series A"
+          },
+          {
+            "name": "Jane Doe",
+            "profile_picture": "https://github.com/shadcn.png",
+            "summary": "Shared pitch deck template from Y Combinator"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Jane Doe",
+    "chat_type": "personal",
+    "profile_picture": "https://github.com/shadcn.png",
+    "topics": [
+      {
+        "topic": "Weekend Plans",
+        "date": "2024-06-23T19:45:00",
+        "points": [
+          {
+            "name": "Jane Doe",
+            "profile_picture": "https://github.com/shadcn.png",
+            "summary": "Suggested hiking at Bear Mountain on Saturday morning"
+          },
+          {
+            "name": "You",
+            "profile_picture": "https://github.com/leerob.png",
+            "summary": "Confirmed availability and offered to bring camping gear"
+          }
+        ]
+      },
+      {
+        "topic": "Project Collaboration",
+        "date": "2024-06-24T10:20:00",
+        "points": [
+          {
+            "name": "Jane Doe",
+            "profile_picture": "https://github.com/shadcn.png",
+            "summary": "Asked for help with React component optimization"
+          },
+          {
+            "name": "You",
+            "profile_picture": "https://github.com/leerob.png",
+            "summary": "Shared useMemo and useCallback best practices"
+          },
+          {
+            "name": "Jane Doe",
+            "profile_picture": "https://github.com/shadcn.png",
+            "summary": "Reported 60% performance improvement after implementation"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "TechCrunch",
+    "chat_type": "channel",
+    "profile_picture": "https://github.com/leerob.png",
+    "topics": [
+      {
+        "topic": "AI Industry Updates",
+        "date": "2024-06-24T09:00:00",
+        "points": [
+          {
+            "name": "TechCrunch",
+            "profile_picture": "https://github.com/leerob.png",
+            "summary": "OpenAI announces GPT-5 with 10x parameter increase"
+          },
+          {
+            "name": "TechCrunch",
+            "profile_picture": "https://github.com/leerob.png",
+            "summary": "Yandex launches new AI coding assistant for developers"
+          },
+          {
+            "name": "TechCrunch",
+            "profile_picture": "https://github.com/leerob.png",
+            "summary": "EU passes new AI regulation framework affecting tech giants"
+          }
+        ]
+      },
+      {
+        "topic": "Startup Ecosystem",
+        "date": "2024-06-24T12:30:00",
+        "points": [
+          {
+            "name": "TechCrunch",
+            "profile_picture": "https://github.com/leerob.png",
+            "summary": "Solana-based fintech raises $50M in Series B funding"
+          },
+          {
+            "name": "TechCrunch",
+            "profile_picture": "https://github.com/leerob.png",
+            "summary": "Top 10 emerging startups to watch in Eastern Europe"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "CS Masters 2024",
+    "chat_type": "group",
+    "profile_picture": "https://github.com/leerob.png",
+    "topics": [
+      {
+        "topic": "Machine Learning Assignment",
+        "date": "2024-06-23T20:15:00",
+        "points": [
+          {
+            "name": "John Doe",
+            "profile_picture": "https://github.com/leerob.png",
+            "summary": "Explained backpropagation algorithm with visual diagrams"
+          },
+          {
+            "name": "Jane Doe",
+            "profile_picture": "https://github.com/shadcn.png",
+            "summary": "Shared Jupyter notebook with solved gradient descent examples"
+          },
+          {
+            "name": "Jane Doe",
+            "profile_picture": "https://github.com/shadcn.png",
+            "summary": "Found bug in professor's sample code, proposed fix"
+          }
+        ]
+      },
+      {
+        "topic": "Exam Preparation",
+        "date": "2024-06-24T11:00:00",
+        "points": [
+          {
+            "name": "Jane Doe",
+            "profile_picture": "https://github.com/shadcn.png",
+            "summary": "Created comprehensive study guide covering all topics"
+          },
+          {
+            "name": "Jane Doe",
+            "profile_picture": "https://github.com/shadcn.png",
+            "summary": "Organized group study session for Thursday evening"
+          },
+          {
+            "name": "Jane Doe",
+            "profile_picture": "https://github.com/shadcn.png",
+            "summary": "Compiled previous years' exam questions with solutions"
+          }
+        ]
+      }
+    ]
+  }
+]

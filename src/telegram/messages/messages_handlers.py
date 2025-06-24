@@ -40,7 +40,6 @@ class MessageHandlers:
             return False
 
         looking_for = ["@athena_tgbot", "афина", "athena"]
-        logger.debug("Checking message: %s", message)
 
         # condition 1: Athena's mentioned in the beggining of the message
         if any(
