@@ -35,10 +35,10 @@ class Telegram:
     default_item_name = "ATHENA_TELEGRAM"
 
     def __init__(self):
-        self.api_token = None
-        self.api_id = None
-        self.api_hash = None
-        self.client = None
+        self.api_token: str | None = None
+        self.api_id: str | None = None
+        self.api_hash: str | None = None
+        self.client: Client | None = None
 
     @classmethod
     async def create(cls, secrets_manager: OnePasswordManager):
@@ -76,23 +76,11 @@ class Telegram:
         assert secrets_manager.client is not None, "Secrets manager client is not set"
 
         logger.debug("Fetching Telegram environment variables")
-        self.api_token = await secrets_manager.get_secret(
-            secrets_manager.default_vault,
-            self.default_item_name,
-            TelegramEnvFields.BOT_TOKEN.value,
-        )
+        fetched_secrets = await secrets_manager.get_secret_item(self.default_item_name)
 
-        self.api_id = await secrets_manager.get_secret(
-            secrets_manager.default_vault,
-            self.default_item_name,
-            TelegramEnvFields.API_ID.value,
-        )
-
-        self.api_hash = await secrets_manager.get_secret(
-            secrets_manager.default_vault,
-            self.default_item_name,
-            TelegramEnvFields.API_HASH.value,
-        )
+        self.api_token = fetched_secrets.get(TelegramEnvFields.BOT_TOKEN.value)
+        self.api_id = fetched_secrets.get(TelegramEnvFields.API_ID.value)
+        self.api_hash = fetched_secrets.get(TelegramEnvFields.API_HASH.value)
 
         self.client = Client(
             name=self.bot_session_name,

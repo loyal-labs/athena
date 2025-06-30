@@ -42,10 +42,10 @@ class TelegraphService(BaseService):
 
     def __init__(self):
         self._model = TelegraphModel()
-        self.access_token = None
-        self.author_name = None
-        self.short_name = None
-        self.author_url = None
+        self.access_token: str | None = None
+        self.author_name: str | None = None
+        self.short_name: str | None = None
+        self.author_url: str | None = None
 
     @classmethod
     async def create(cls, secrets_manager: OnePasswordManager):
@@ -83,31 +83,14 @@ class TelegraphService(BaseService):
         )
         assert secrets_manager.client is not None, "Secrets manager client is not set"
 
+        fetched_secrets = await secrets_manager.get_secret_item(self.default_item_name)
+
         logger.debug("Fetching Telegraph environment variables")
 
-        self.author_name = await secrets_manager.get_secret(
-            secrets_manager.default_vault,
-            self.default_item_name,
-            TelegraphEnvFields.AUTHOR_NAME.value,
-        )
-
-        self.short_name = await secrets_manager.get_secret(
-            secrets_manager.default_vault,
-            self.default_item_name,
-            TelegraphEnvFields.SHORT_NAME.value,
-        )
-
-        self.author_url = await secrets_manager.get_secret(
-            secrets_manager.default_vault,
-            self.default_item_name,
-            TelegraphEnvFields.AUTHOR_URL.value,
-        )
-
-        self.access_token = await secrets_manager.get_secret(
-            secrets_manager.default_vault,
-            self.default_item_name,
-            TelegraphEnvFields.ACCESS_TOKEN.value,
-        )
+        self.author_name = fetched_secrets.get(TelegraphEnvFields.AUTHOR_NAME.value)
+        self.short_name = fetched_secrets.get(TelegraphEnvFields.SHORT_NAME.value)
+        self.author_url = fetched_secrets.get(TelegraphEnvFields.AUTHOR_URL.value)
+        self.access_token = fetched_secrets.get(TelegraphEnvFields.ACCESS_TOKEN.value)
 
     async def __prepare_markdown_content(self, content: str) -> list[dict[str, Any]]:
         try:

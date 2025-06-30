@@ -18,6 +18,9 @@ instance_class: F2
 
 entrypoint: uvicorn app:app --host 0.0.0.0 --port $PORT --loop uvloop
 
+beta_settings:
+  cloud_sql_instances: "telemetree-457722:us-central1:telemetree-prod"
+
 automatic_scaling:
   min_instances: 1
   max_instances: 1 
@@ -52,12 +55,15 @@ env_variables:
   # App Engine: Telegraph
   TELEGRAPH_ACCESS_TOKEN: 'loyal-athena-telegraph-access-token'
 
+
+
 liveness_check:
   path: "/ping"
   check_interval_sec: 30
   timeout_sec: 4
   failure_threshold: 2
   success_threshold: 2
+  initial_delay_sec: 10
 
 readiness_check:
   path: "/ping"
@@ -65,7 +71,7 @@ readiness_check:
   timeout_sec: 4
   failure_threshold: 2
   success_threshold: 2
-  app_start_timeout_sec: 3000
+  app_start_timeout_sec: 60
 
 
 handlers:

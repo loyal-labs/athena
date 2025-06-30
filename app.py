@@ -40,14 +40,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         init_service(container, "disk_cache_instance"),
         # services with secrets
         init_service(container, "telegram_object", secrets_manager),
-        init_service(container, "db", secrets_manager),
+        # init_service(container, "db", secrets_manager),
     ]
     (
         _,
         event_bus,
         _,
         telegram,
-        db,
+        # db,
     ) = await asyncio.gather(*key_service_init_tasks)
 
     # --- Service Initialization ---
@@ -81,11 +81,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("Shutting down the application")
 
     # --- Database Shutdown ---
-    try:
-        await db.close()
-    except Exception as e:
-        logger.exception("Error closing database")
-        raise e
+    # try:
+    #     await db.close()
+    # except Exception as e:
+    #     logger.exception("Error closing database")
+    #     raise e
 
     logger.info("Application stopped")
 

@@ -26,7 +26,7 @@ def get_disk_cache() -> Cache:
     if _cache_instance is None:
         # Explicitly use the /tmp directory which is usually writable
 
-        cache_dir = Path(__file__).parent.parent.parent / "tmp" / ".cache"
+        cache_dir = Path("/tmp/.cache")
         logger.info("Using cache directory: %s", cache_dir)
 
         # Ensure cache directory exists

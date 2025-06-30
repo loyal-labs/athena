@@ -13,13 +13,7 @@ async def get_chat_summary() -> list[ChatSummary]:
     """
     Get the chat summary for the current user.
     """
-    path = (
-        Path(__file__).parent.parent.parent.parent
-        / "tests"
-        / "api"
-        / "fixtures"
-        / "chat_summary_mocks.json"
-    )
+    path = Path("tests/api/fixtures/chat_summary_mocks.json")
 
     with open(path) as f:
         mocked_data = json.load(f)

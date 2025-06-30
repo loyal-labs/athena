@@ -2,7 +2,7 @@ import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from enum import Enum
-from typing import Any, cast
+from typing import Any
 
 from sqlalchemy import URL, Result
 from sqlalchemy.ext.asyncio import (
@@ -36,16 +36,16 @@ class PostgreSQL:
         self.port = self.default_port
 
         # From 1Password
-        self.user = None
-        self.db_name = None
-        self.password = None
+        self.user: str | None = None
+        self.db_name: str | None = None
+        self.password: str | None = None
 
         # Post init variables
-        self.url = None
-        self.safe_url = None
+        self.url: URL | None = None
+        self.safe_url: URL | None = None
 
-        self.engine = None
-        self.async_session = None
+        self.engine: AsyncEngine | None = None
+        self.async_session: async_sessionmaker[AsyncSession] | None = None
 
         logger.debug("Attempting to connect using effective URL: %s", self.safe_url)
 
@@ -93,29 +93,17 @@ class PostgreSQL:
         assert self.engine is not None, "Engine is not set"
         assert self.async_session is not None, "Async session is not set"
 
-        self.engine = cast(AsyncEngine, self.engine)
-        self.async_session = cast(async_sessionmaker[AsyncSession], self.async_session)  # type: ignore
-
     async def __init_db(self, secrets_manager: OnePasswordManager):
         assert secrets_manager is not None, "Secrets manager is not set"
         assert isinstance(secrets_manager, OnePasswordManager), (
             "Secrets manager is not an instance of OnePasswordManager"
         )
-        self.user = await secrets_manager.get_secret(
-            secrets_manager.default_vault,
-            self.default_item_name,
-            DatabaseEnvFields.USER.value,
-        )
-        self.db_name = await secrets_manager.get_secret(
-            secrets_manager.default_vault,
-            self.default_item_name,
-            DatabaseEnvFields.DATABASE.value,
-        )
-        self.password = await secrets_manager.get_secret(
-            secrets_manager.default_vault,
-            self.default_item_name,
-            DatabaseEnvFields.PASSWORD.value,
-        )
+
+        fetched_secrets = await secrets_manager.get_secret_item(self.default_item_name)
+        self.user = fetched_secrets.get(DatabaseEnvFields.USER.value)
+        self.db_name = fetched_secrets.get(DatabaseEnvFields.DATABASE.value)
+        self.password = fetched_secrets.get(DatabaseEnvFields.PASSWORD.value)
+
         self.url = self.__build_sqlalchemy_url(use_placeholder_password=False)
         self.safe_url = self.__build_sqlalchemy_url(use_placeholder_password=True)
 
