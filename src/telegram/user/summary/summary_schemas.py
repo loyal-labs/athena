@@ -13,13 +13,15 @@ class TelegramEntity(SQLModel, table=True):
     title: str | None = None
     username: str | None = None
     small_pfp: str | None = None
-    total_messages: int = 0
+    total_messages: int = -1
     unread_count: int = 0
     last_message_date: datetime | None = None
     is_pinned: bool = False
     members_count: int | None = None
     is_creator: bool = False
     is_admin: bool = False
+
+    rating: float = 0.0
 
     @classmethod
     def from_dialog(cls, dialog: Dialog) -> "TelegramEntity":
@@ -39,7 +41,7 @@ class TelegramEntity(SQLModel, table=True):
             dialog.top_message.id
             if dialog.top_message
             and chat_type in [ChatType.SUPERGROUP, ChatType.CHANNEL]
-            else 0
+            else -1
         )
         unread_count = dialog.unread_messages_count or 0
         last_message_date = dialog.top_message.date if dialog.top_message else None
@@ -62,4 +64,5 @@ class TelegramEntity(SQLModel, table=True):
             members_count=members_count,
             is_creator=is_creator,
             is_admin=is_admin,
+            rating=0.0,
         )
