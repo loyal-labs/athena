@@ -4,11 +4,11 @@ from typing import Literal
 from pydantic_ai import Agent, RunContext
 
 from src.shared.event_registry import TelemetreeTopics
-from src.telegram.messages.messages_constants import (
+from src.telegram.bot.messages.messages_constants import (
     DECISION_AGENT_PROMPT,
     RESPONSE_AGENT_PROMPT,
 )
-from src.telegram.messages.messages_schemas import ResponseDependencies
+from src.telegram.bot.messages.messages_schemas import ResponseDependencies
 
 logger = logging.getLogger("athena.telegram.messages.agent")
 

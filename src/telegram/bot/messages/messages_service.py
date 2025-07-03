@@ -6,8 +6,8 @@ from pyrogram.types import ForceReply
 from src.shared.base import BaseService
 from src.shared.event_bus import Event, EventBus
 from src.shared.event_registry import MessageTopics
-from src.telegram.messages.messages_agent import run_decision_agent
-from src.telegram.messages.messages_schemas import (
+from src.telegram.bot.messages.messages_agent import run_decision_agent
+from src.telegram.bot.messages.messages_schemas import (
     GramMessage,
     RespondToMessagePayload,
     ResponseDependencies,

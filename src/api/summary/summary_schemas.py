@@ -13,6 +13,14 @@ class ChatTypes(str, Enum):
     GROUP = "group"
     CHANNEL = "channel"
 
+    @classmethod
+    def from_telegram_type(cls, telegram_type: str) -> "ChatTypes":
+        """Convert Telegram chat type to API chat type."""
+        try:
+            return cls(telegram_type.lower())
+        except ValueError:
+            return cls.GROUP
+
 
 class Entity(BaseModel):
     """

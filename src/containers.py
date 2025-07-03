@@ -10,7 +10,7 @@ from pyrogram.client import Client
 from src.shared.base import BaseService
 from src.shared.base_llm import VertexConfig, VertexLLM
 from src.shared.cache import get_disk_cache
-from src.shared.database import PostgreSQL
+from src.shared.database import Database
 from src.shared.event_bus import EventBus
 from src.shared.logging_utils import configure_logging
 from src.shared.secrets import OnePasswordManager
@@ -31,7 +31,7 @@ class Container(containers.DeclarativeContainer):
     # # --- DATABASE ---
 
     db = providers.Singleton(
-        PostgreSQL,
+        Database,
     )
 
     # -- Database Session --
@@ -161,7 +161,7 @@ async def init_service(
             assert secrets_manager is not None, "Secrets manager is not set"
             service = await service.create(secrets_manager)
 
-        elif isinstance(service, PostgreSQL):
+        elif isinstance(service, Database):
             assert secrets_manager is not None, "Secrets manager is not set"
             service = await service.create(secrets_manager)
 

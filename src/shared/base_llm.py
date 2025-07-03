@@ -237,11 +237,13 @@ class VertexLLM(ProviderBase):
         task_type: str | None = None,
     ) -> list[float] | list[list[float]]:
         try:
-            assert content
-            assert isinstance(content, list)
-            assert len(content) > 0
-            assert all(isinstance(item, str) for item in content)
-            assert task_type is not None
+            assert content, "Content is empty"
+            assert isinstance(content, list), "Content is not a list"
+            assert len(content) > 0, "Content is empty"
+            assert all(isinstance(item, str) for item in content), (
+                "Content is not a list of strings"
+            )
+            assert task_type is not None, "Task type is not set"
         except AssertionError as e:
             raise ValueError("Invalid content or dimensionality") from e
 

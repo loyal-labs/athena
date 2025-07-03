@@ -73,7 +73,7 @@ class CommunityMessageProcessor:
         return (important_msgs_with_scores, embeddings)  # type: ignore
 
     async def get_model_embeddings(
-        self, messages: list[ChatMessage], batch_size: int = 256
+        self, messages: list[ChatMessage], batch_size: int = 250
     ) -> np.ndarray[Any, Any]:
         from sklearn.preprocessing import StandardScaler
 
@@ -85,9 +85,9 @@ class CommunityMessageProcessor:
             embedding_attempts = 0
 
             batch = messages[i : i + batch_size]
+
             batch_texts: list[str] = []
-            batch_time_features = [int(msg.timestamp.timestamp()) for msg in batch]
-            time_features.extend(batch_time_features)
+            batch_timestamps: list[int] = []
 
             for msg in batch:
                 message = msg.message
@@ -96,19 +96,28 @@ class CommunityMessageProcessor:
                 if msg.link_preview_description:
                     message += f"\n{msg.link_preview_description}"
 
-                batch_texts.append(message)
+                if message:  # Filter out empty messages
+                    batch_texts.append(message)
+                    batch_timestamps.append(int(msg.timestamp.timestamp()))
+
+            if not batch_texts:
+                continue
+
+            time_features.extend(batch_timestamps)
 
             # Get embeddings from Gemini
             try:
-                for _ in range(3):
-                    response = await self.model.embed_content(batch_texts)
-                    break
+                response = await self.model.embed_content(batch_texts, "CLUSTERING")
             except Exception as e:
                 embedding_attempts += 1
                 logger.error(f"Error embedding content: {e}")
                 raise e
 
             text_embeddings.extend(response)  # type: ignore
+
+        # Handle case where all messages were filtered out
+        if not text_embeddings:
+            return np.array([])
 
         # Normalize time features
         normalized_time_features = np.array(time_features).reshape(-1, 1)

@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta
+from logging import getLogger
 from typing import cast
 
+import pandas as pd
 from pyrogram.client import Client
 from pyrogram.enums import ChatType
 from pyrogram.raw.functions.contacts.get_top_peers import GetTopPeers
@@ -9,7 +11,7 @@ from pyrogram.raw.types.peer_channel import PeerChannel
 from pyrogram.raw.types.peer_chat import PeerChat
 from pyrogram.raw.types.peer_user import PeerUser
 
-from src.telegram.user.summary.summary_schemas import TelegramEntity
+from src.telegram.user.summary.summary_schemas import ChatMessage, TelegramEntity
 
 SUPPORTED_CHAT_TYPES = [
     ChatType.GROUP,
@@ -19,8 +21,86 @@ SUPPORTED_CHAT_TYPES = [
 ]
 TOP_PEERS_LIMIT = 40
 
+logger = getLogger("telegram.user.summary.summary_service")
+
 
 class SummaryService:
+    async def isolate_interests(self, client: Client) -> pd.DataFrame:
+        """
+        Isolate interests from the dialogs.
+        """
+        assert client is not None, "Client is required"
+        assert isinstance(client, Client), "Client must be an instance of Client"
+
+        logger.debug("Getting dialogs...")
+        dialogs = await self.get_recent_dialogs(client)
+        dialogs_array_dict = [dialog.model_dump() for dialog in dialogs]
+        dialogs_df = pd.DataFrame(dialogs_array_dict)
+
+        logger.debug("Getting top peers rating...")
+        top_peers_rating = await self.get_top_peers_rating(client)
+        top_peers_rating_df = pd.DataFrame(
+            top_peers_rating.items(), columns=["chat_id", "rating"]
+        )
+
+        # Merge dialogs and top peers rating
+        logger.debug("Merging dialogs and top peers rating...")
+        dialogs_df["rating"] = dialogs_df["chat_id"].map(  # type: ignore
+            top_peers_rating_df.set_index("chat_id")["rating"]  # type: ignore
+        )
+
+        # Isolate personal chats
+        personal_df = dialogs_df[dialogs_df["chat_type"] == "PRIVATE"]
+
+        # Isolate group chats
+        group_df = dialogs_df[dialogs_df["chat_type"].isin(["GROUP", "SUPERGROUP"])]  # type: ignore
+        group_df = group_df[group_df["rating"] > 0]
+
+        # Isolate channels
+        channels_df = dialogs_df[dialogs_df["chat_type"] == "CHANNEL"]
+        channels_df_with_rating = channels_df[channels_df["rating"] > 0]
+        channels_df_read = channels_df[channels_df["unread_count"] < 10]
+
+        # Concatenate all dataframes
+        final_df = pd.concat(
+            [personal_df, group_df, channels_df_with_rating, channels_df_read]
+        )
+        # drop duplicates by chat_id
+        final_df = final_df.drop_duplicates(subset=["chat_id"])
+        final_df = final_df.sort_values(by="rating", ascending=False)  # type: ignore
+        return final_df
+
+    async def get_recent_messages(
+        self,
+        client: Client,
+        chat_id: int,
+        day_offset: int = 30,
+        username: str | None = None,
+    ) -> list[ChatMessage]:
+        assert client is not None, "Client is required"
+        assert isinstance(client, Client), "Client must be an instance of Client"
+        assert day_offset > 0, "Day offset must be greater than 0"
+
+        start_date = datetime.now()
+        stop_date = start_date - timedelta(days=day_offset)
+        owner_id = client.me.id if client.me else -1
+
+        messages: list[ChatMessage] = []
+
+        logger.debug(f"Getting recent messages for chat {chat_id}...")
+
+        chosen_param = username if username else chat_id
+        async for message in client.get_chat_history(chosen_param, limit=100):
+            if message.date and message.date < stop_date:
+                break
+
+            if message.text:
+                messages.append(
+                    ChatMessage.extract_chat_message_info(message, owner_id, chat_id)
+                )
+        logger.debug(f"Found {len(messages)} messages")
+        return messages
+
     async def get_recent_dialogs(
         self, client: Client, day_offset: int = 30
     ) -> list[TelegramEntity]:
@@ -42,6 +122,8 @@ class SummaryService:
         start_date = datetime.now()
         stop_date = start_date - timedelta(days=day_offset)
 
+        user_id = client.me.id if client.me else -1
+
         response_array: list[TelegramEntity] = []
 
         async for dialog in client.get_dialogs():
@@ -52,7 +134,7 @@ class SummaryService:
                 if dialog.top_message.date < stop_date:
                     break
 
-            entity = TelegramEntity.from_dialog(dialog)
+            entity = TelegramEntity.from_dialog(dialog, user_id)
             response_array.append(entity)
 
         return response_array
@@ -107,7 +189,6 @@ class SummaryService:
             for outet_peer in category.peers:
                 entity_id = None
                 peer = outet_peer.peer
-                print(type(peer))
                 if isinstance(peer, PeerUser):
                     entity_id = peer.user_id
                 elif isinstance(peer, PeerChannel):

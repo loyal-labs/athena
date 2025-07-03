@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 from typing import cast
@@ -56,8 +57,8 @@ class OnePasswordManager:
         """
 
         logger.info("Creating OnePasswordManager")
-        service_token = get_secret(cls.secret_value)
-        host = get_secret(cls.host_value)
+        service_token = os.getenv(cls.secret_value, "")
+        host = os.getenv(cls.host_value, "")
         assert service_token is not None, f"{cls.secret_value} is not set"
         assert host is not None, f"{cls.host_value} is not set"
         logger.info("Fetched OnePassword service token")
@@ -125,3 +126,26 @@ class OnePasswordManager:
             raise e
 
         return response_dict
+
+
+class SecretsFactory:
+    """Global singleton factory for Secrets."""
+
+    _instance: OnePasswordManager | None = None
+    _lock = asyncio.Lock()
+
+    @classmethod
+    async def get_instance(cls) -> OnePasswordManager:
+        """Get or create singleton instance of OnePasswordManager."""
+        if cls._instance is None:
+            async with cls._lock:
+                if cls._instance is None:
+                    logger.info("Creating Database singleton")
+                    cls._instance = await OnePasswordManager.create()
+                    logger.info("Database singleton created")
+        return cls._instance
+
+    @classmethod
+    def reset_instance(cls):
+        """Reset the singleton instance (useful for testing)."""
+        cls._instance = None
