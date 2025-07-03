@@ -166,6 +166,7 @@ run.py
 /src/athena/core/clients/sessions/
 ideas.md
 planning.md
+testing_tg.py
 
 ### SQLite ###
 *.db

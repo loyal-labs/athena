@@ -16,7 +16,7 @@ from src.shared.logging_utils import configure_logging
 from src.shared.secrets import OnePasswordManager
 from src.shared.types import SessionFactory
 from src.shared.uow import UnitOfWork
-from src.telegram.client.telegram_client import Telegram
+from src.telegram.bot.telegram_bot import TelegramBot
 from src.telegram.messages.messages_handlers import MessageHandlers
 from src.telegram.messages.messages_service import MessagesService
 from src.telemetree.posts.posts_service import PostsService
@@ -55,7 +55,7 @@ class Container(containers.DeclarativeContainer):
     observability = providers.Factory(configure_logging)
 
     # -- Telegram --
-    telegram_object = providers.Singleton(Telegram)
+    telegram_object = providers.Singleton(TelegramBot)
     telegram_client = providers.Factory[Client](
         lambda telegram_bot: telegram_bot.get_client(),  # type: ignore
         telegram_bot=telegram_object,
@@ -157,7 +157,7 @@ async def init_service(
         service = service_dict[name]()
         logger.debug("Initialized service %s", name)
 
-        if isinstance(service, Telegram):
+        if isinstance(service, TelegramBot):
             assert secrets_manager is not None, "Secrets manager is not set"
             service = await service.create(secrets_manager)
 

@@ -24,7 +24,7 @@ class TelegramEnvFields(Enum):
     API_HASH = "TELEGRAM_API_HASH"
 
 
-class Telegram:
+class TelegramBot:
     """Telegram bot client."""
 
     status: TelegramBotStatus = TelegramBotStatus.STOPPED

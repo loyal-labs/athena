@@ -114,7 +114,6 @@ class OnePasswordManager:
                     assert field.label is not None, "Field label is not set"  # type: ignore
                     assert field.value is not None, "Field value is not set"  # type: ignore
                 except AssertionError:
-                    logger.warning("Empty entry in %s", item_name)
                     continue
                 except Exception as e:
                     logger.exception("Error getting secret %s", item_name)
