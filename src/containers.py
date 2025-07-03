@@ -16,9 +16,9 @@ from src.shared.logging_utils import configure_logging
 from src.shared.secrets import OnePasswordManager
 from src.shared.types import SessionFactory
 from src.shared.uow import UnitOfWork
-from src.telegram.bot.telegram_bot import TelegramBot
-from src.telegram.messages.messages_handlers import MessageHandlers
-from src.telegram.messages.messages_service import MessagesService
+from src.telegram.bot.client.telegram_bot import TelegramBot
+from src.telegram.bot.messages.messages_handlers import MessageHandlers
+from src.telegram.bot.messages.messages_service import MessagesService
 from src.telemetree.posts.posts_service import PostsService
 
 logger = logging.getLogger("athena.containers")

@@ -69,7 +69,7 @@ class VertexConfig(BaseSettings):
     """Vertex-specific configuration with explicit environment binding"""
 
     # extra environment variables
-    embedding_model_name: str = "text-embedding-004"
+    embedding_model_name: str = "gemini-embedding-001"
     project_id: str = Field(default="", description="The project ID")
     region: str = Field(default="", description="The region")
     # constants
