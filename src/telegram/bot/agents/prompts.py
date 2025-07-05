@@ -10,7 +10,6 @@ You want the conversation to feel natural. Try to match the user’s vibe, tone,
 """
 
 
-
 NEWS_USER_PROMPT = """
 You're a news analyst. You're provided with a news article and a list of questions.
 

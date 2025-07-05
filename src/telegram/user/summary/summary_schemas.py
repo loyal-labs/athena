@@ -3,7 +3,7 @@ from logging import getLogger
 from typing import Any
 
 from pyrogram.enums import ChatType
-from pyrogram.types import Dialog, Message
+from pyrogram.types import Chat, Dialog, Message
 from sqlalchemy import JSON, BigInteger, ForeignKeyConstraint
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import Field, SQLModel, select
@@ -61,6 +61,52 @@ class TelegramEntity(SQLModel, table=True):
         return cls(
             owner_id=owner_id,
             chat_id=dialog.chat.id,
+            chat_type=chat_type.name,
+            title=title,
+            username=username,
+            small_pfp=small_pfp,
+            total_messages=total_messages,
+            unread_count=unread_count,
+            last_message_date=last_message_date,
+            is_pinned=is_pinned,
+            members_count=members_count,
+            is_creator=is_creator,
+            is_admin=is_admin,
+            rating=0.0,
+        )
+
+    @classmethod
+    def from_chat(cls, chat: Chat, message: Message, owner_id: int) -> "TelegramEntity":
+        assert chat.id is not None, "Chat ID is required"
+        assert chat.type is not None, "Chat type is required"
+
+        chat_type: ChatType = chat.type
+        if chat_type == ChatType.PRIVATE:
+            assert message.from_user is not None, "Message from user is required"
+            title = message.from_user.first_name
+        else:
+            title = chat.title
+
+        username = chat.username or None
+        small_pfp = chat.photo.small_file_id if chat.photo else None
+
+        # TODO: if it's channel or supergroup, take it from the message
+        if chat_type in [ChatType.SUPERGROUP, ChatType.CHANNEL]:
+            total_messages = message.id
+        else:
+            total_messages = -1
+
+        unread_count = chat.unread_count or 0
+        last_message_date = datetime.now()
+        is_pinned = False
+
+        members_count = chat.members_count or 1
+        is_creator = chat.is_creator or False
+        is_admin = chat.is_admin or False
+
+        return cls(
+            owner_id=owner_id,
+            chat_id=chat.id,
             chat_type=chat_type.name,
             title=title,
             username=username,

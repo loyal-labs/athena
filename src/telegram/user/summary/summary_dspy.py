@@ -12,12 +12,12 @@ from src.telegram.user.summary.summary_schemas import ChatMessage
 class TopicSummary(dspy.Signature):
     """Extract topics and key points from messages in a single pass."""
 
-    messages: str = dspy.InputField(
+    messages: str = dspy.InputField(  # type: ignore
         desc="JSON array of messages with author, timestamp, and content"
-    )  # type: ignore
+    )
 
     topics: str = dspy.OutputField(  # type: ignore
-        desc="JSON array of distinct topics discussed. Group related messages into separate topics. Each topic must have: title (2-4 words), key_points (array of max 3 objects with 'username' and 'point' fields), and message_indices (array of message indexes belonging to this topic). Analyze the conversation flow and create multiple topics when the discussion shifts. Each point should be a concise action or statement."
+        desc="JSON array of distinct topics discussed. Group related messages into separate topics. Each topic must have: title (2-4 words), key_points (array of max 3 objects with 'username' and 'point' fields), and message_indices (array of message indexes belonging to this topic). Analyze the conversation flow and create multiple topics when the discussion shifts (3 max). Each point should be a concise action or statement."
     )
 
 
@@ -54,25 +54,9 @@ class TelegramSummaryPipeline(dspy.Module):
         # Sort messages by timestamp
         messages = sorted(messages, key=lambda m: m.timestamp)
 
-        # Filter messages by engagement score (pre-filter to reduce input)
-        significant_messages = [m for m in messages if m.engagement_score >= 0.3]
-
-        if not significant_messages:
-            return {
-                "chat_name": chat_name,
-                "chat_type": chat_type,
-                "time_period": self._format_time_period(
-                    messages[0].timestamp, messages[-1].timestamp
-                ),
-                "total_participants": len(
-                    {m.first_name or m.username or "Unknown" for m in messages}
-                ),
-                "topics": [],
-            }
-
         # Prepare messages for LLM (simplified format)
-        messages_data = []
-        for i, msg in enumerate(significant_messages):
+        messages_data: list[dict[str, Any]] = []
+        for i, msg in enumerate(messages):
             author = msg.first_name or msg.username or "Unknown"
             messages_data.append(
                 {
@@ -85,7 +69,8 @@ class TelegramSummaryPipeline(dspy.Module):
 
         # Single LLM call to extract topics and summaries
         try:
-            result = self.extract_topics(messages=json.dumps(messages_data))
+            result = self.extract_topics(messages=json.dumps(messages_data))  # type: ignore
+            assert isinstance(result, TopicSummary), "Result is not a TopicSummary"
             topics_data = json.loads(result.topics)
         except Exception as e:
             print(f"Error extracting topics: {e}")
@@ -96,16 +81,17 @@ class TelegramSummaryPipeline(dspy.Module):
                     "key_points": [
                         {"username": "Unknown", "point": "Various messages exchanged"}
                     ],
-                    "message_indices": list(range(len(significant_messages))),
+                    "message_indices": list(range(len(messages))),
                 }
             ]
 
         # Format output
-        topics = []
+        topics: list[dict[str, Any]] = []
         for topic in topics_data:
             # Get messages for this topic
-            topic_messages = [
-                significant_messages[i] for i in topic.get("message_indices", [])
+            topic_messages: list[ChatMessage] = [
+                messages[i]  # type: ignore
+                for i in topic.get("message_indices", [])  # type: ignore
             ]
             if not topic_messages:
                 continue

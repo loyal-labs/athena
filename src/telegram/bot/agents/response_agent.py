@@ -9,7 +9,7 @@ from pydantic_ai.settings import ModelSettings
 
 from src.shared.base import BaseService
 from src.shared.base_llm import VertexLLM
-from src.telegram.agents.prompts import RESPONSE_SYSTEM_PROMPT
+from src.telegram.bot.agents.prompts import RESPONSE_SYSTEM_PROMPT
 
 logger = logging.getLogger("athena.telegram.response")
 
