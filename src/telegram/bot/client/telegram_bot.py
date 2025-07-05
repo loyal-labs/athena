@@ -9,7 +9,7 @@ from pyrogram.methods.utilities.idle import idle
 
 from src.shared.secrets import OnePasswordManager
 
-logger = logging.getLogger("athena.telegram.client")
+logger = logging.getLogger("athena.telegram.bot.client")
 
 
 class TelegramBotStatus(Enum):
