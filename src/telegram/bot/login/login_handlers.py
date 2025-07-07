@@ -9,6 +9,8 @@ from pyrogram.handlers.message_handler import MessageHandler
 from pyrogram.types import Message, WebAppData
 
 from src.shared.database import DatabaseFactory
+from src.telegram.user.login.login_schemas import LoginSession
+from src.telegram.user.onboarding.onboarding_service import OnboardingService
 from telegram.user.telegram_session_manager import UserSessionFactory
 
 logger = logging.getLogger("athena.telegram.login.handlers")
@@ -65,6 +67,14 @@ class LoginHandlers:
                 auth_key=auth_key,
                 db_session=db_session,
             )
+
+            # Check if first-time user and run onboarding
+            login_sessions = await LoginSession.get_by_owner(
+                message.from_user.id, db_session
+            )
+            if login_sessions and not login_sessions[0].is_onboarded:
+                onboarding = OnboardingService()
+                await onboarding.run_onboarding_pipeline(message.from_user.id)
 
     @property
     def login_handlers(self) -> list[Handler]:

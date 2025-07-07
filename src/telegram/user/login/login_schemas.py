@@ -19,6 +19,7 @@ class LoginSession(SQLModel, table=True):
     session_string: str = Field(sa_type=String, primary_key=True)
     created_at: datetime = Field(sa_type=DateTime, default_factory=datetime.now)
     updated_at: datetime = Field(sa_type=DateTime, default_factory=datetime.now)
+    is_onboarded: bool = Field(default=False)
 
     # Relationship to TelegramEntity
     telegram_entities: list["TelegramEntity"] = Relationship(
