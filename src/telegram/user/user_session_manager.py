@@ -108,8 +108,9 @@ class UserSessionManager:
 
             # Get session from database
             login_sessions = await LoginSession.get_by_owner(owner_id, db_session)
-            if not login_sessions:
-                raise ValueError(f"No session found for owner_id: {owner_id}")
+            assert login_sessions is not None, (
+                f"No login sessions found for owner_id: {owner_id}"
+            )
 
             # Use the most recent session
             login_session = sorted(
@@ -275,6 +276,46 @@ class UserSessionManager:
     def is_session_active(self, owner_id: int) -> bool:
         """Check if a session is currently active in memory."""
         return owner_id in self._sessions
+
+    async def extend_session_ttl(self, owner_id: int) -> bool:
+        """
+        Extend the TTL for a specific session to keep it alive.
+
+        This should be called when there's activity on the session to prevent
+        it from being evicted due to TTL expiration.
+
+        Args:
+            owner_id: The owner ID of the session to extend
+
+        Returns:
+            True if session was found and extended, False otherwise
+        """
+        if owner_id not in self._sessions:
+            return False
+
+        # Update last access time to current time
+        self._last_access[owner_id] = datetime.now()
+
+        # Also update LRU order to mark as recently used
+        self._sessions.move_to_end(owner_id)
+
+        logger.debug(f"Extended TTL for session owner {owner_id}")
+        return True
+
+    async def extend_session_ttl_batch(self, owner_ids: list[int]) -> dict[int, bool]:
+        """
+        Extend TTL for multiple sessions at once.
+
+        Args:
+            owner_ids: List of owner IDs to extend
+
+        Returns:
+            Dictionary mapping owner_id to success status
+        """
+        results: dict[int, bool] = {}
+        for owner_id in owner_ids:
+            results[owner_id] = await self.extend_session_ttl(owner_id)
+        return results
 
 
 class UserSessionFactory:
