@@ -1,18 +1,28 @@
 from datetime import datetime
 from logging import getLogger
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pyrogram.enums import ChatType
 from pyrogram.types import Chat, Dialog, Message
 from sqlalchemy import JSON, BigInteger, ForeignKeyConstraint
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import Field, SQLModel, select
+from sqlmodel import Field, Relationship, SQLModel, select
+
+if TYPE_CHECKING:
+    from src.telegram.user.login.login_schemas import LoginSession
 
 logger = getLogger("telegram.user.summary.summary_schemas")
 
 
 class TelegramEntity(SQLModel, table=True):
     __tablename__ = "telegram_entities"  # type: ignore
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["owner_id"],
+            ["login_sessions.owner_id"],
+            ondelete="CASCADE",
+        ),
+    )
 
     owner_id: int = Field(sa_type=BigInteger, primary_key=True)
     chat_id: int = Field(sa_type=BigInteger, primary_key=True)
@@ -29,6 +39,21 @@ class TelegramEntity(SQLModel, table=True):
     is_admin: bool = False
 
     rating: float = 0.0
+
+    # Relationship to LoginSession
+    login_session: "LoginSession" = Relationship(
+        back_populates="telegram_entities", sa_relationship_kwargs={"lazy": "select"}
+    )
+
+    # Relationships to child tables
+    chat_messages: list["ChatMessage"] = Relationship(
+        back_populates="telegram_entity",
+        sa_relationship_kwargs={"lazy": "select", "cascade": "all, delete-orphan"},
+    )
+    chat_summaries: list["ChatSummary"] = Relationship(
+        back_populates="telegram_entity",
+        sa_relationship_kwargs={"lazy": "select", "cascade": "all, delete-orphan"},
+    )
 
     @classmethod
     def from_dialog(cls, dialog: Dialog, owner_id: int) -> "TelegramEntity":
@@ -202,6 +227,7 @@ class ChatMessage(SQLModel, table=True):
         ForeignKeyConstraint(
             ["owner_id", "chat_id"],
             ["telegram_entities.owner_id", "telegram_entities.chat_id"],
+            ondelete="CASCADE",
         ),
     )
 
@@ -214,6 +240,11 @@ class ChatMessage(SQLModel, table=True):
     username: str | None = Field(None, description="Username of the sender")
     message: str = Field(description="Message content")
     timestamp: datetime = Field(description="Timestamp of the message")
+
+    # Relationship to TelegramEntity
+    telegram_entity: "TelegramEntity" = Relationship(
+        back_populates="chat_messages", sa_relationship_kwargs={"lazy": "select"}
+    )
 
     @classmethod
     def extract_chat_message_info(
@@ -313,6 +344,7 @@ class ChatSummary(SQLModel, table=True):
         ForeignKeyConstraint(
             ["owner_id", "chat_id"],
             ["telegram_entities.owner_id", "telegram_entities.chat_id"],
+            ondelete="CASCADE",
         ),
     )
 
@@ -328,6 +360,11 @@ class ChatSummary(SQLModel, table=True):
     )
 
     created_at: datetime = Field(default_factory=datetime.now)
+
+    # Relationship to TelegramEntity
+    telegram_entity: "TelegramEntity" = Relationship(
+        back_populates="chat_summaries", sa_relationship_kwargs={"lazy": "select"}
+    )
 
     @classmethod
     def from_pipeline_output(
@@ -350,7 +387,7 @@ class ChatSummary(SQLModel, table=True):
                 points.append(
                     {
                         "name": kp["username"],
-                        "profile_picture": "",  # Would need to fetch from TelegramEntity
+                        "profile_picture": "",
                         "summary": kp["point"],
                     }
                 )

@@ -57,10 +57,7 @@ class SummaryHandlers:
 
         async with database.session() as session:
             telegram_entity = await self.__get_telegram_entity(client, message, session)
-            chat_message = await self.__conditional_message_insert(
-                message, telegram_entity, session
-            )
-
+            await self.__conditional_message_insert(message, telegram_entity, session)
             logger.debug("Chat message created for chat %s", telegram_entity.chat_id)
 
     @property
