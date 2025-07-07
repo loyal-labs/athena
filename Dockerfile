@@ -28,5 +28,5 @@ ENV PATH="/app/.venv/bin:$PATH"
 # Reset the entrypoint, don't invoke `uv`
 ENTRYPOINT []
 
-# Run the FastAPI application by default
-CMD ["uv", "run", "uvicorn", "app:app", "--reload"]
+# Use our custom entrypoint script
+CMD ["/app/scripts/docker-entrypoint.sh"]

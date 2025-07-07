@@ -121,23 +121,6 @@ class Database:
         )
         return sqlalchemy_url
 
-    async def create_all(self):
-        """
-        Initializes the database connection and optionally creates tables.
-        """
-        logger.debug("Initializing database connection to %s", self.safe_url)
-        assert self.engine is not None, "Engine is not set"
-
-        async with self.engine.begin() as conn:
-            # TODO: Add Alembic migrations
-            logger.warning(
-                "Running SQLModel.metadata.create_all. Use Alembic for production."
-            )
-            await conn.run_sync(SQLModel.metadata.create_all)
-
-        logger.debug("Database connection initialized, tables checked/created.")
-        return self
-
     async def drop_all(self):
         """
         Drops all tables defined in SQLModel.metadata using CASCADE.

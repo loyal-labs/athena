@@ -9,6 +9,7 @@ authors = [
 requires-python = ">=3.12"
 dependencies = [
     "aiohttp>=3.11.18",
+    "alembic>=1.16.2",
     "asyncpg>=0.30.0",
     "colorlog>=6.9.0",
     "commitizen>=4.6.0",
@@ -96,3 +97,4 @@ testpaths = ["tests"]
 
 [tool.uv.sources]
 kurigram = { url = "https://github.com/KurimuzonAkuma/pyrogram/archive/565c9a1a7f20b81a6532f2e70a1730c20e6be8e4.zip" }
+
