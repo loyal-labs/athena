@@ -27,10 +27,6 @@ CHANNELS_PREFIX = f"{TELEGRAM_PREFIX}.channels"
 MESSAGES_PREFIX = f"{TELEGRAM_PREFIX}.messages"
 
 
-class MessageTopics(Enum):
-    RESPOND_TO_MESSAGE = f"{MESSAGES_PREFIX}.respond"
-
-
 """
 TELEMETREE INTEGRATION EVENTS
 """

@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from enum import Enum
 from pathlib import Path
@@ -7,7 +8,7 @@ from pyrogram.enums import ParseMode
 from pyrogram.handlers.handler import Handler
 from pyrogram.methods.utilities.idle import idle
 
-from src.shared.secrets import OnePasswordManager
+from src.shared.secrets import OnePasswordManager, SecretsFactory
 
 logger = logging.getLogger("athena.telegram.bot.client")
 
@@ -41,12 +42,9 @@ class TelegramBot:
         self.client: Client | None = None
 
     @classmethod
-    async def create(cls, secrets_manager: OnePasswordManager):
+    async def create(cls):
         """Asynchronously creates and initializes a Telegram bot client."""
-        assert secrets_manager is not None, "Secrets manager is not set"
-        assert isinstance(secrets_manager, OnePasswordManager), (
-            "Secrets manager is not an instance of OnePasswordManager"
-        )
+        secrets_manager = await SecretsFactory.get_instance()
 
         self = cls()
         await self.__init_client(secrets_manager)
@@ -146,3 +144,20 @@ class TelegramBot:
 
         await self.client.stop()
         self.change_status(TelegramBotStatus.STOPPED)
+
+
+class TelegramBotFactory:
+    _instance: TelegramBot | None = None
+    _lock = asyncio.Lock()
+
+    @classmethod
+    async def get_instance(cls) -> TelegramBot:
+        if cls._instance is None:
+            async with cls._lock:
+                if cls._instance is None:
+                    cls._instance = await TelegramBot.create()
+        return cls._instance
+
+    @classmethod
+    def reset_instance(cls):
+        cls._instance = None

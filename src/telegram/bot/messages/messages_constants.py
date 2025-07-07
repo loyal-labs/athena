@@ -15,13 +15,3 @@ Style:
 
 Response limit: 1000 tokens.
 """
-
-DECISION_AGENT_PROMPT = """
-You're an AI agent manager. You have message history, incoming query and a list of tools to choose from.
-
-Your job is to decide which tool to use based on the incoming query.
-
-Guidelines:
-- Use the `delegate_to_news_agent` tool when the user's asking for news.
-- Use the `delegate_to_chat_agent` tool when the user's asking for a chat.
-"""

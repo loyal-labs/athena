@@ -7,8 +7,7 @@ from pyrogram.handlers.handler import Handler
 from pyrogram.handlers.message_handler import MessageHandler
 from pyrogram.types import Message
 
-from src.shared.event_bus import EventBus
-from src.shared.event_registry import MessageTopics
+from src.telegram.bot.messages.messages_service import MessagesService
 
 logger = logging.getLogger("athena.telegram.messages.handlers")
 
@@ -17,9 +16,6 @@ class MessageHandlers:
     """
     Message handlers class
     """
-
-    def __init__(self, event_bus: EventBus):
-        self.event_bus = event_bus
 
     @staticmethod
     async def start_message(client: Client, message: Message) -> Message:
@@ -77,11 +73,7 @@ class MessageHandlers:
         logger.debug("Received message: %s", message.text)
 
         await client.send_chat_action(message.chat.id, ChatAction.TYPING)
-        await self.event_bus.request(
-            MessageTopics.RESPOND_TO_MESSAGE,
-            client=client,
-            message=message,
-        )
+        await MessagesService.respond_to_message(client, message)
 
     @property
     def message_handlers(self) -> list[Handler]:

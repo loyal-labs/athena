@@ -18,7 +18,6 @@ class GroupResponseAgent(BaseService):
     def __init__(self, provider: VertexLLM):
         super().__init__()
         self.provider = provider
-        # -- creating an agent --
 
         self.agent_object = Agent(
             name="Group Response Agent",

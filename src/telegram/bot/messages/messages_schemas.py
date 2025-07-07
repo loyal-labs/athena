@@ -4,11 +4,7 @@ from datetime import datetime
 from typing import Literal, Self
 
 from pydantic import BaseModel
-from pyrogram.client import Client
 from pyrogram.types import Message
-
-from src.shared.event_bus import EventBus
-from src.shared.events import EventPayload
 
 logger = logging.getLogger("athena.telegram.messages.schemas")
 
@@ -20,7 +16,6 @@ AGENTS
 @dataclass
 class ResponseDependencies:
     last_messages: list["GramMessage"]
-    event_bus: EventBus
     sender: str
     message: Message
 
@@ -58,13 +53,3 @@ class GramMessage(BaseModel):
             date=message.date,
             role="assistant" if message.from_user.is_bot else "user",
         )
-
-
-"""
-EVENT PAYLOADS
-"""
-
-
-class RespondToMessagePayload(EventPayload):
-    client: Client
-    message: Message

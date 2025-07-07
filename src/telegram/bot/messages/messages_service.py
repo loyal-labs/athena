@@ -1,36 +1,19 @@
 import logging
 from typing import cast
 
-from pyrogram.types import ForceReply
+from pyrogram.client import Client
+from pyrogram.types import ForceReply, Message
 
 from src.shared.base import BaseService
-from src.shared.event_bus import Event, EventBus
-from src.shared.event_registry import MessageTopics
-from src.telegram.bot.messages.messages_agent import run_decision_agent
-from src.telegram.bot.messages.messages_schemas import (
-    GramMessage,
-    RespondToMessagePayload,
-    ResponseDependencies,
-)
+from src.telegram.bot.messages.messages_agent import run_response_agent
+from src.telegram.bot.messages.messages_schemas import GramMessage, ResponseDependencies
 
 logger = logging.getLogger("athena.telegram.messages.service")
 
 
 class MessagesService(BaseService):
-    def __init__(self, event_bus: EventBus):
-        super().__init__()
-        self.event_bus = event_bus
-
-    @EventBus.subscribe(MessageTopics.RESPOND_TO_MESSAGE)
-    async def respond_to_message(self, event: Event) -> None:
-        logger.debug("Responding to message: %s", event.payload)
-        payload = cast(
-            RespondToMessagePayload,
-            event.extract_payload(event, RespondToMessagePayload),
-        )
-        client = payload.client
-        og_message = payload.message
-
+    @classmethod
+    async def respond_to_message(cls, client: Client, og_message: Message) -> None:
         try:
             logger.debug("Checking asserts")
             assert og_message.chat
@@ -75,12 +58,11 @@ class MessagesService(BaseService):
         logger.debug("Creating ResponseDependencies")
         deps = ResponseDependencies(
             last_messages=gram_messages,
-            event_bus=self.event_bus,
             sender=sender,
             message=og_message,
         )
         logger.debug("Starting response agent")
-        response = await self.start_response_agent(query, deps)
+        response = await run_response_agent(query, deps)
         logger.debug("Response agent finished")
 
         logger.debug("Sending response to message %s", og_message.id)
@@ -90,7 +72,3 @@ class MessagesService(BaseService):
         )
         logger.debug("Response sent to message %s", og_message.id)
         return
-
-    async def start_response_agent(self, query: str, deps: ResponseDependencies) -> str:
-        response = await run_decision_agent(query, deps)
-        return response
