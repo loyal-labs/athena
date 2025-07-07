@@ -5,13 +5,15 @@ services:
       - "8000:8000"
     environment:
       - OP_SERVICE_ACCOUNT_TOKEN=${OP_SERVICE_ACCOUNT_TOKEN}
+      - LOGGING_LEVEL="WARNING"
+      - GLOBAL_APP_ENV="local"
     volumes:
       - .:/app
     depends_on:
       - postgres
 
   postgres:
-    image: postgres:16
+    image: postgres:17
     ports:
       - "5432:5432"
     environment:

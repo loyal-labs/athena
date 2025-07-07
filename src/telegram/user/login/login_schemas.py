@@ -15,7 +15,7 @@ logger = getLogger("telegram.user.login.login_schemas")
 class LoginSession(SQLModel, table=True):
     __tablename__ = "login_sessions"  # type: ignore
 
-    owner_id: int = Field(sa_type=BigInteger, primary_key=True)
+    owner_id: int = Field(sa_type=BigInteger, primary_key=True, unique=True)
     session_string: str = Field(sa_type=String, primary_key=True)
     created_at: datetime = Field(sa_type=DateTime, default_factory=datetime.now)
     updated_at: datetime = Field(sa_type=DateTime, default_factory=datetime.now)

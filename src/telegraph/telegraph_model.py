@@ -1,5 +1,6 @@
-import json
 from typing import Any, cast
+
+import orjson
 
 from src.shared.exceptions import HTTPError
 from src.shared.http import AsyncHttpClient
@@ -102,7 +103,7 @@ class TelegraphModel:
         params = {"access_token": access_token}
         if fields:
             # API expects fields as a JSON array string
-            params["fields"] = json.dumps(fields)
+            params["fields"] = orjson.dumps(fields).decode("utf-8")
         return await self._request("getAccountInfo", params=params, http_method="GET")
 
     async def revoke_access_token(self, access_token: str) -> dict[str, Any]:

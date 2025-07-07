@@ -3,9 +3,16 @@
 aiohappyeyeballs==2.6.1
     # via aiohttp
 aiohttp==3.11.18
-    # via athena (pyproject.toml)
+    # via
+    #   athena (pyproject.toml)
+    #   fsspec
+    #   litellm
 aiosignal==1.3.2
     # via aiohttp
+alembic==1.16.2
+    # via
+    #   athena (pyproject.toml)
+    #   optuna
 annotated-types==0.7.0
     # via pydantic
 anthropic==0.50.0
@@ -13,6 +20,8 @@ anthropic==0.50.0
 anyio==4.9.0
     # via
     #   anthropic
+    #   asyncer
+    #   dspy
     #   groq
     #   httpx
     #   mcp
@@ -24,10 +33,17 @@ argcomplete==3.5.3
     # via
     #   commitizen
     #   pydantic-ai-slim
+asyncer==0.0.8
+    # via dspy
 asyncpg==0.30.0
     # via athena (pyproject.toml)
 attrs==25.3.0
-    # via aiohttp
+    # via
+    #   aiohttp
+    #   jsonschema
+    #   referencing
+backoff==2.2.1
+    # via dspy
 boto3==1.38.0
     # via pydantic-ai-slim
 botocore==1.38.0
@@ -35,7 +51,9 @@ botocore==1.38.0
     #   boto3
     #   s3transfer
 cachetools==5.5.2
-    # via google-auth
+    # via
+    #   dspy
+    #   google-auth
 certifi==2025.1.31
     # via
     #   httpcore
@@ -46,7 +64,11 @@ charset-normalizer==3.4.1
     #   commitizen
     #   requests
 click==8.1.8
-    # via uvicorn
+    # via
+    #   litellm
+    #   uvicorn
+cloudpickle==3.1.1
+    # via dspy
 cohere==5.15.0
     # via pydantic-ai-slim
 colorama==0.4.6
@@ -54,17 +76,29 @@ colorama==0.4.6
     #   commitizen
     #   griffe
 colorlog==6.9.0
-    # via athena (pyproject.toml)
+    # via
+    #   athena (pyproject.toml)
+    #   optuna
 commitizen==4.6.0
     # via athena (pyproject.toml)
+cython==3.1.2
+    # via athena (pyproject.toml)
+datasets==3.6.0
+    # via dspy
 decli==0.6.2
     # via commitizen
 dependency-injector==4.46.0
     # via athena (pyproject.toml)
 deprecated==1.2.18
     # via opentelemetry-api
+dill==0.3.8
+    # via
+    #   datasets
+    #   multiprocess
 diskcache==5.6.3
-    # via athena (pyproject.toml)
+    # via
+    #   athena (pyproject.toml)
+    #   dspy
 distro==1.9.0
     # via
     #   anthropic
@@ -72,6 +106,8 @@ distro==1.9.0
     #   openai
 docstring-parser==0.16
     # via google-cloud-aiplatform
+dspy==2.6.27
+    # via athena (pyproject.toml)
 eval-type-backport==0.2.2
     # via
     #   mistralai
@@ -81,13 +117,17 @@ fastapi==0.115.12
 fastavro==1.10.0
     # via cohere
 filelock==3.18.0
-    # via huggingface-hub
+    # via
+    #   datasets
+    #   huggingface-hub
 frozenlist==1.6.0
     # via
     #   aiohttp
     #   aiosignal
-fsspec==2025.3.2
-    # via huggingface-hub
+fsspec==2025.3.0
+    # via
+    #   datasets
+    #   huggingface-hub
 google-ai-generativelanguage==0.6.15
     # via google-generativeai
 google-api-core==2.24.2
@@ -170,6 +210,8 @@ h11==0.14.0
     # via
     #   httpcore
     #   uvicorn
+hdbscan==0.8.40
+    # via athena (pyproject.toml)
 httpcore==1.0.8
     # via httpx
 httplib2==0.22.0
@@ -181,6 +223,7 @@ httpx==0.28.1
     #   anthropic
     #   cohere
     #   groq
+    #   litellm
     #   mcp
     #   mistralai
     #   openai
@@ -191,7 +234,9 @@ httpx-sse==0.4.0
     #   cohere
     #   mcp
 huggingface-hub==0.30.2
-    # via tokenizers
+    # via
+    #   datasets
+    #   tokenizers
 idna==3.10
     # via
     #   anyio
@@ -199,11 +244,15 @@ idna==3.10
     #   requests
     #   yarl
 importlib-metadata==8.6.1
-    # via opentelemetry-api
+    # via
+    #   litellm
+    #   opentelemetry-api
 iniconfig==2.1.0
     # via pytest
 jinja2==3.1.6
-    # via commitizen
+    # via
+    #   commitizen
+    #   litellm
 jiter==0.9.0
     # via
     #   anthropic
@@ -212,8 +261,21 @@ jmespath==1.0.1
     # via
     #   boto3
     #   botocore
+joblib==1.5.1
+    # via
+    #   dspy
+    #   hdbscan
+    #   scikit-learn
+json-repair==0.47.6
+    # via dspy
+jsonschema==4.24.0
+    # via litellm
+jsonschema-specifications==2025.4.1
+    # via jsonschema
 kurigram @ https://github.com/KurimuzonAkuma/pyrogram/archive/565c9a1a7f20b81a6532f2e70a1730c20e6be8e4.zip
     # via athena (pyproject.toml)
+litellm==1.74.0.post1
+    # via dspy
 logfire-api==3.14.0
     # via
     #   pydantic-evals
@@ -222,12 +284,18 @@ lxml==5.4.0
     # via lxml-html-clean
 lxml-html-clean==0.4.2
     # via athena (pyproject.toml)
+magicattr==0.1.6
+    # via dspy
+mako==1.3.10
+    # via alembic
 markdown==3.8
     # via athena (pyproject.toml)
 markdown-it-py==3.0.0
     # via rich
 markupsafe==3.0.2
-    # via jinja2
+    # via
+    #   jinja2
+    #   mako
 mcp==1.6.0
     # via pydantic-ai-slim
 mdurl==0.1.2
@@ -238,23 +306,48 @@ multidict==6.4.3
     # via
     #   aiohttp
     #   yarl
+multiprocess==0.70.16
+    # via datasets
 numpy==2.2.5
-    # via shapely
+    # via
+    #   athena (pyproject.toml)
+    #   datasets
+    #   dspy
+    #   hdbscan
+    #   optuna
+    #   pandas
+    #   scikit-learn
+    #   scipy
+    #   shapely
 onepassword-sdk==0.3.1
     # via athena (pyproject.toml)
+onepasswordconnectsdk==1.3.0
+    # via athena (pyproject.toml)
 openai==1.75.0
-    # via pydantic-ai-slim
+    # via
+    #   dspy
+    #   litellm
+    #   pydantic-ai-slim
 opentelemetry-api==1.32.1
     # via pydantic-ai-slim
+optuna==4.4.0
+    # via dspy
 orjson==3.10.16
     # via athena (pyproject.toml)
 packaging==25.0
     # via
     #   commitizen
+    #   datasets
     #   google-cloud-aiplatform
     #   google-cloud-bigquery
     #   huggingface-hub
+    #   optuna
     #   pytest
+pandas==2.3.1
+    # via
+    #   athena (pyproject.toml)
+    #   datasets
+    #   dspy
 pluggy==1.6.0
     # via pytest
 prompt-toolkit==3.0.51
@@ -286,6 +379,8 @@ protobuf==5.29.4
     #   proto-plus
 pyaes==1.6.1
     # via kurigram
+pyarrow==20.0.0
+    # via datasets
 pyasn1==0.6.1
     # via
     #   pyasn1-modules
@@ -297,10 +392,12 @@ pydantic==2.11.3
     #   athena (pyproject.toml)
     #   anthropic
     #   cohere
+    #   dspy
     #   fastapi
     #   google-cloud-aiplatform
     #   google-generativeai
     #   groq
+    #   litellm
     #   mcp
     #   mistralai
     #   onepassword-sdk
@@ -345,35 +442,71 @@ python-dateutil==2.9.0.post0
     #   botocore
     #   google-cloud-bigquery
     #   mistralai
+    #   onepasswordconnectsdk
+    #   pandas
 python-dotenv==1.1.0
-    # via pydantic-settings
+    # via
+    #   litellm
+    #   pydantic-settings
+pytz==2025.2
+    # via pandas
 pyyaml==6.0.2
     # via
     #   commitizen
+    #   datasets
     #   huggingface-hub
+    #   optuna
     #   pydantic-evals
 questionary==2.1.0
     # via commitizen
+referencing==0.36.2
+    # via
+    #   jsonschema
+    #   jsonschema-specifications
+regex==2024.11.6
+    # via
+    #   dspy
+    #   tiktoken
 requests==2.32.3
     # via
     #   cohere
+    #   datasets
+    #   dspy
     #   google-api-core
     #   google-cloud-bigquery
     #   google-cloud-storage
     #   huggingface-hub
+    #   onepasswordconnectsdk
     #   pydantic-ai-slim
+    #   tiktoken
 rich==14.0.0
     # via
+    #   dspy
     #   pydantic-ai-slim
     #   pydantic-evals
+rpds-py==0.26.0
+    # via
+    #   jsonschema
+    #   referencing
 rsa==4.9.1
     # via google-auth
 s3transfer==0.12.0
     # via boto3
+scikit-learn==1.7.0
+    # via
+    #   athena (pyproject.toml)
+    #   hdbscan
+scipy==1.16.0
+    # via
+    #   athena (pyproject.toml)
+    #   hdbscan
+    #   scikit-learn
 shapely==2.1.0
     # via google-cloud-aiplatform
 six==1.17.0
-    # via python-dateutil
+    # via
+    #   onepasswordconnectsdk
+    #   python-dateutil
 sniffio==1.3.1
     # via
     #   anthropic
@@ -383,6 +516,8 @@ sniffio==1.3.1
 sqlalchemy==2.0.40
     # via
     #   athena (pyproject.toml)
+    #   alembic
+    #   optuna
     #   sqlmodel
 sqlmodel==0.0.24
     # via athena (pyproject.toml)
@@ -393,23 +528,35 @@ starlette==0.46.2
     #   fastapi
     #   mcp
     #   sse-starlette
+tenacity==9.1.2
+    # via dspy
 termcolor==2.5.0
     # via commitizen
 tgcrypto==1.2.5
     # via athena (pyproject.toml)
+threadpoolctl==3.6.0
+    # via scikit-learn
+tiktoken==0.9.0
+    # via litellm
 tokenizers==0.21.1
-    # via cohere
+    # via
+    #   cohere
+    #   litellm
 tomlkit==0.13.2
     # via commitizen
 tqdm==4.67.1
     # via
+    #   datasets
+    #   dspy
     #   google-generativeai
     #   huggingface-hub
     #   openai
+    #   optuna
 types-requests==2.32.0.20250328
     # via cohere
 typing-extensions==4.13.2
     # via
+    #   alembic
     #   anthropic
     #   anyio
     #   cohere
@@ -420,6 +567,7 @@ typing-extensions==4.13.2
     #   openai
     #   pydantic
     #   pydantic-core
+    #   referencing
     #   sqlalchemy
     #   typing-inspection
 typing-inspection==0.4.0
@@ -429,6 +577,10 @@ typing-inspection==0.4.0
     #   pydantic-ai-slim
     #   pydantic-graph
     #   pydantic-settings
+tzdata==2025.2
+    # via pandas
+ujson==5.10.0
+    # via dspy
 uritemplate==4.1.1
     # via google-api-python-client
 urllib3==2.4.0
@@ -446,6 +598,8 @@ wcwidth==0.2.13
     # via prompt-toolkit
 wrapt==1.17.2
     # via deprecated
+xxhash==3.5.0
+    # via datasets
 yarl==1.20.0
     # via aiohttp
 zipp==3.21.0

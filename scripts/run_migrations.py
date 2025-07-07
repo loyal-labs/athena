@@ -1,16 +1,19 @@
 #!/usr/bin/env python
-"""Run Alembic migrations before starting the application."""
+"""Wait for database connection before running migrations."""
 
 import asyncio
 import logging
+import os
 import sys
 from pathlib import Path
 
 from sqlalchemy import text
 
-from alembic import command
-from alembic.config import Config
-from src.shared.database import DatabaseFactory
+project_root = Path(__file__).parent.parent.resolve()
+sys.path.insert(0, str(project_root))
+os.chdir(project_root)
+
+from src.shared.database import DatabaseFactory  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -40,44 +43,16 @@ async def wait_for_database(max_retries: int = 30, retry_delay: int = 2):
     return False
 
 
-def run_migrations():
-    """Run Alembic migrations."""
-    try:
-        # Get the alembic.ini path
-        alembic_ini_path = Path(__file__).parent.parent / "alembic.ini"
-
-        if not alembic_ini_path.exists():
-            logger.error(f"alembic.ini not found at {alembic_ini_path}")
-            return False
-
-        # Create Alembic configuration
-        alembic_cfg = Config(str(alembic_ini_path))
-
-        # Run migrations
-        logger.info("Running database migrations...")
-        command.upgrade(alembic_cfg, "head")
-        logger.info("Migrations completed successfully")
-        return True
-    except Exception as e:
-        logger.error(f"Migration failed: {e}")
-        return False
-
-
 async def main():
-    """Main function to coordinate database setup."""
-    logger.info("Starting database migration process...")
+    """Main function to wait for database connection."""
+    logger.info("Waiting for database to be ready...")
 
     # Wait for database to be ready
     if not await wait_for_database():
         logger.error("Database is not available after maximum retries")
         sys.exit(1)
 
-    # Run migrations
-    if not run_migrations():
-        logger.error("Failed to run migrations")
-        sys.exit(1)
-
-    logger.info("Database setup completed successfully")
+    logger.info("Database is ready! You can now run migrations.")
 
 
 if __name__ == "__main__":

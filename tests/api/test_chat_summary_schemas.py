@@ -1,7 +1,7 @@
-import json
 from datetime import datetime
 from pathlib import Path
 
+import orjson
 import pytest
 from pydantic import ValidationError
 
@@ -18,7 +18,7 @@ def mock_chat_summaries():
     """Load mock chat summary data from JSON fixture."""
     fixture_path = Path(__file__).parent / "fixtures" / "chat_summary_mocks.json"
     with open(fixture_path) as f:
-        return json.load(f)
+        return orjson.loads(f.read())
 
 
 class TestChatSummaryPoint:

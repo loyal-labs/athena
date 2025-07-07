@@ -4,11 +4,11 @@ Copyright (c) 2016 Garry G
 Licensed under the MIT License
 """
 
-import json
 import re
 from typing import Any, cast
 from urllib.parse import quote_plus, urlparse
 
+import orjson
 from lxml import html
 from lxml.html.clean import Cleaner
 
@@ -580,7 +580,7 @@ def convert_html_to_telegraph_format(
         content = [_recursive_convert(x) for x in body.iterchildren()]  # type: ignore
 
     if output_format == OutputFormat.JSON_STRING:
-        return json.dumps(content, ensure_ascii=False)
+        return orjson.dumps(content).decode("utf-8")
     elif output_format == OutputFormat.PYTHON_LIST:
         return content
     elif output_format == OutputFormat.HTML_STRING:

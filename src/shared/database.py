@@ -103,7 +103,6 @@ class Database:
         self.db_name = fetched_secrets.get(DatabaseEnvFields.DATABASE.value)
         self.password = fetched_secrets.get(DatabaseEnvFields.PASSWORD.value)
 
-        print(self.user, self.db_name, self.password)
         self.url = self.__build_sqlalchemy_url(use_placeholder_password=False)
         self.safe_url = self.__build_sqlalchemy_url(use_placeholder_password=True)
 

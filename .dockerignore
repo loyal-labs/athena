@@ -1,2 +1,10 @@
 # Exclude the project virtual environment from image builds
-.venv
+.env
+.env.*
+*.env
+__pycache__
+.git
+.pytest_cache
+node_modules
+.vscode
+.idea

@@ -1,6 +1,6 @@
-import json
 import logging
 
+import orjson
 from pyrogram import filters
 from pyrogram.client import Client
 from pyrogram.enums import MessageServiceType
@@ -27,8 +27,8 @@ class LoginHandlers:
 
         web_app_data_str = web_app_data.data
         try:
-            data_dict = json.loads(web_app_data_str)
-        except json.JSONDecodeError as e:
+            data_dict = orjson.loads(web_app_data_str)
+        except orjson.JSONDecodeError as e:
             logger.error("Failed to parse web_app_data: %s", web_app_data_str)
             raise ValueError(f"Failed to parse web_app_data: {web_app_data_str}") from e
         except Exception as e:

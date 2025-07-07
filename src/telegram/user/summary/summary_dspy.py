@@ -1,11 +1,12 @@
 """DSPy pipeline for Telegram message summarization and topic extraction."""
 
-import json
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 import dspy
+import orjson
 
+from src.shared.base_llm import LLMFactory
 from src.telegram.user.summary.summary_schemas import ChatMessage
 
 
@@ -69,9 +70,9 @@ class TelegramSummaryPipeline(dspy.Module):
 
         # Single LLM call to extract topics and summaries
         try:
-            result = self.extract_topics(messages=json.dumps(messages_data))  # type: ignore
+            result = self.extract_topics(messages=orjson.dumps(messages_data))  # type: ignore
             assert isinstance(result, TopicSummary), "Result is not a TopicSummary"
-            topics_data = json.loads(result.topics)
+            topics_data = orjson.loads(result.topics)
         except Exception as e:
             print(f"Error extracting topics: {e}")
             # Fallback: single topic with all messages
@@ -160,15 +161,19 @@ async def summarize_chat_messages(
         Dictionary with chat summary including topics and key points
     """
     # Configure DSPy with the model
+    vertex_llm = await LLMFactory.get_instance()
+    gemini_api_key = vertex_llm.gemini_api_key
+    max_tokens = 8000
+
     lm = dspy.LM(
-        "gemini/gemini-2.5-flash",
-        api_key="AIzaSyBMPJf9OMm7aklpawWRbNiff1z4cOWWvmU",
-        max_tokens=8000,
+        "gemini/gemini-2.5-flash-lite-preview-06-17",
+        api_key=gemini_api_key,
+        max_tokens=max_tokens,
     )
     dspy.settings.configure(lm=lm)  # type: ignore
 
     # Create and run the pipeline
     pipeline = TelegramSummaryPipeline()
-    summary = pipeline(messages, chat_name, chat_type)
+    summary = pipeline(messages, chat_name, chat_type)  # type: ignore
 
-    return summary
+    return cast(dict[str, Any], summary)

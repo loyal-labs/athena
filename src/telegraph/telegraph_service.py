@@ -1,9 +1,9 @@
-import json
 import logging
 from enum import Enum
 from typing import Any, cast
 
 import markdown
+import orjson
 
 from src.shared.base import BaseService
 from src.shared.event_bus import Event, EventBus
@@ -277,7 +277,7 @@ class TelegraphService(BaseService):
                 NodeElement.model_validate(n) if isinstance(n, dict) else n
                 for n in content
             ]
-            content_json = json.dumps(validated_nodes)
+            content_json = orjson.dumps(validated_nodes).decode("utf-8")
         except Exception as e:
             raise ValueError(f"Invalid content structure: {e}") from e
 

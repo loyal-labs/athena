@@ -107,7 +107,7 @@ class OnboardingService(BaseService):
         📊 Total chats of interest: {total_chats}
         👥 Groups of interest: {groups}
         📢 Channels of interest: {channels}
-        💬 Private Chats of interest: {private}
+        💬 Private chats of interest: {private}
 
         🔥 <b>Your Most Active Chats:</b>
         """

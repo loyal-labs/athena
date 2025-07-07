@@ -1,6 +1,5 @@
-import json
-
 import markdown
+import orjson
 import pytest
 
 from src.telegraph.telegraph_utils import convert_html_to_telegraph_format
@@ -51,7 +50,7 @@ class TestTelegraphConversions:
 
         with open(expected_output_file, encoding="utf-8") as f:
             if conversion_type == "json":
-                expected_output = json.load(f)
+                expected_output = orjson.loads(f.read())
             else:
                 expected_output = f.read()
 

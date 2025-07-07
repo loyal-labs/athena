@@ -4,7 +4,6 @@ import os
 from typing import cast
 
 from dotenv import load_dotenv
-from google.cloud import secretmanager
 from onepasswordconnectsdk.client import Client, Item, new_client
 from onepasswordconnectsdk.models.field import Field
 from pydantic import BaseModel
@@ -22,14 +21,6 @@ class SecretsSchema(BaseModel):
 
 
 load_dotenv()
-
-
-def get_secret(secret_id: str) -> str:
-    project_id = os.getenv("VERTEX_PROJECT_ID", "")
-    client = secretmanager.SecretManagerServiceClient()
-    name = f"projects/{project_id}/secrets/{secret_id}/versions/latest"
-    response = client.access_secret_version(name=name)  # type: ignore
-    return response.payload.data.decode("UTF-8")
 
 
 class OnePasswordManager:
@@ -92,6 +83,23 @@ class OnePasswordManager:
         logger.debug("Client initialized")
         self.client = client
         return client
+
+    async def get_secret_file(self, item_name: str, file_id: str) -> str:
+        assert self.client is not None, "Client is not initialized"
+        assert self.default_vault_uuid is not None, "Vault UUID is not set"
+        assert item_name is not None, "Item name is not set"
+        assert file_id is not None, "File ID is not set"
+
+        item = cast(
+            Item, self.client.get_item_by_title(item_name, self.default_vault_uuid)
+        )
+        assert item is not None, "Item is not set"
+        assert isinstance(item, Item), "Item is not an Item"
+        item_id = cast(str, item.id)  # type: ignore
+
+        files = self.client.get_file_content(file_id, item_id, self.default_vault_uuid)
+        files = files.decode("utf-8")
+        return files
 
     async def get_secret_item(self, item_name: str) -> SecretsSchema:
         assert self.client is not None, "Client is not initialized"

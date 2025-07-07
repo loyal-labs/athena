@@ -1,195 +1,86 @@
+import asyncio
 import logging
-from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Any, Self, cast
+from typing import Any
 
+import orjson
 import vertexai  # type: ignore
 import vertexai.generative_models  # type: ignore
-from pydantic import Field, model_validator
+from google.oauth2 import service_account
 from pydantic_ai.models import KnownModelName, Model
 from pydantic_ai.models.gemini import GeminiModel
 from pydantic_ai.providers import Provider
 from pydantic_ai.providers.google_vertex import GoogleVertexProvider
-from pydantic_settings import BaseSettings
-from vertexai.language_models import (
-    TextEmbeddingInput,  # type: ignore
-    TextEmbeddingModel,
-)
+from vertexai.language_models import TextEmbeddingInput, TextEmbeddingModel
 from vertexai.language_models._language_models import TextEmbedding  # type: ignore
+
+from src.shared.secrets import OnePasswordManager, SecretsFactory
 
 logger = logging.getLogger("athena.base_llm")
 
-try:
-    # --- Google Auth for auto-detection of project_id ---
-    import google.auth
-    import google.auth.exceptions
-    from google.auth.exceptions import DefaultCredentialsError
 
-    GOOGLE_AUTH_AVAILABLE = True
-except ImportError:
-    GOOGLE_AUTH_AVAILABLE = False  # type: ignore
-    logger.warning(
-        "`google-auth` library not found. Google Cloud Project ID auto-detection will be disabled."  # noqa: E501
-    )
+class VertexEnvFields(Enum):
+    PROJECT_ID = "VERTEX_PROJECT_ID"
+    REGION = "VERTEX_REGION"
+    SERVICE_ID = "VERTEX_SERVICE_ID"
+    GEMINI_API_KEY = "GEMINI_API_KEY"
 
 
-"""
-ENUMS
-"""
-
-
-class SupportedModels(Enum):
-    VERTEX = "vertex"
-
-
-"""
-MODEL CONFIGS
-"""
-
-
-class ProviderConfigBase(BaseSettings):
-    """Base class for provider configuration"""
-
-    # Required fields
-    model_name: str = Field(..., min_length=1)  # Make required field
-    api_key: str = Field(..., min_length=1)  # Required base field
-
-    # Default fields
-    default_token_limit: int = Field(default=1024, gt=0)
-    default_max_retries: int = Field(default=3, gt=0)
-    default_temperature: float = Field(default=1.0, gt=0, lt=1.5)
-    default_retries: int = Field(default=2, gt=0)
-
-    class Config:
-        extra = "ignore"
-        env_file = ".env"
-
-
-class VertexConfig(BaseSettings):
-    """Vertex-specific configuration with explicit environment binding"""
-
-    # extra environment variables
-    embedding_model_name: str = "gemini-embedding-001"
-    project_id: str = Field(default="", description="The project ID")
-    region: str = Field(default="", description="The region")
-    # constants
-    dimensionality: int = Field(default=768, ge=1, le=768)
-
-    class Config:
-        env_prefix = "VERTEX_"
-        extra = "ignore"
-        env_file = ".env"
-
-    @model_validator(mode="after")
-    def _resolve_project_id(self) -> Self:
-        """
-        Attempts to auto-detect project_id if not explicitly provided via
-        VERTEX_PROJECT_ID environment variable. Raises error if required
-        and not found.
-        """
-        if self.project_id:
-            # Project ID was successfully loaded from VERTEX_PROJECT_ID env var
-            logger.info("Using explicitly set VERTEX_PROJECT_ID: %s", self.project_id)
-            return self
-
-        if not GOOGLE_AUTH_AVAILABLE:
-            # Cannot auto-detect, and it wasn't set via env var
-            raise ValueError(
-                "VertexConfig requires project_id. "
-                "Set VERTEX_PROJECT_ID or install 'google-auth' for auto-detection."
-            )
-
-        # Attempt auto-detection using google-auth library
-        logger.info(
-            "VERTEX_PROJECT_ID not set, attempting Google Cloud auto-detection..."
-        )
-        try:
-            _credentials, detected_project_id = google.auth.default()  # type: ignore
-
-            if detected_project_id:
-                logger.info(
-                    "Auto-detected Google Cloud Project ID: %s",
-                    detected_project_id,  # type: ignore
-                )
-                self.project_id = cast(str, detected_project_id)
-            else:
-                # Credentials found, but project ID was not associated
-                raise ValueError(
-                    "VertexConfig requires project_id. "
-                    "Could not auto-detect project ID. Set VERTEX_PROJECT_ID env var."
-                )
-
-        except DefaultCredentialsError as e:  # type: ignore
-            # Running locally without `gcloud auth application-default login`
-            raise ValueError(
-                "VertexConfig requires project_id. "
-                "Could not find default Google credentials for auto-detection. "
-                "Set VERTEX_PROJECT_ID or configure Application Default Credentials."
-            ) from e
-        except Exception as e:
-            raise ValueError(
-                f"Unexpected error during project ID auto-detection: {e}"
-            ) from e
-
-        # Final check - If project_id is still None here, something went wrong
-        if not self.project_id:
-            raise ValueError("Failed to determine project_id for VertexConfig.")
-
-        return self  # Return the validated/modified model instance
-
-
-"""
-LLM PROVIDERS
-"""
-
-
-class ProviderBase(ABC):
-    """Abstract base class for all provider implementations"""
-
-    @property
-    @abstractmethod
-    def provider_name(self) -> KnownModelName:
-        """Provider name"""
-        pass
-
-    @property
-    @abstractmethod
-    def provider(self) -> Provider[Any]:
-        """Pydantic LLM provider"""
-        pass
-
-    @property
-    @abstractmethod
-    def model(self) -> Model:
-        """Pydantic LLM model"""
-        pass
-
-    def get_model(self) -> Model:
-        return self.model
-
-    @abstractmethod
-    async def embed_content(
-        self, content: str | list[str], task_type: Any | None = None
-    ) -> list[float] | list[list[float]]:
-        """Embed content using the LLM"""
-        pass
-
-
-class VertexLLM(ProviderBase):
+class VertexLLM:
     """Vertex LLM provider"""
 
-    def __init__(self, config: VertexConfig):
-        logger.debug("Initializing VertexLLM")
-        self.config = config
+    EMBEDDING_MODEL_NAME = "gemini-embedding-001"
+    DIMENSIONALITY = 768
+    DEFAULT_ITEM_NAME = "ATHENA_VERTEX"
 
+    VERTEX_LITE_MODEL = "gemini-2.5-flash-lite-preview-06-17"
+
+    def __init__(self):
+        self.embedding_model: TextEmbeddingModel | None = None
+        self.project_id: str | None = None
+        self.region: str | None = None
+        self.gemini_api_key: str | None = None
+
+    @classmethod
+    async def create(cls):
+        secrets_manager = await SecretsFactory.get_instance()
+
+        self = cls()
+        await self.__init_client(secrets_manager)
+        return self
+
+    async def __init_client(self, secrets_manager: OnePasswordManager):
+        secrets = await secrets_manager.get_secret_item(self.DEFAULT_ITEM_NAME)
+
+        self.project_id = secrets.secrets.get(VertexEnvFields.PROJECT_ID.value)
+        self.region = secrets.secrets.get(VertexEnvFields.REGION.value)
+        self.gemini_api_key = secrets.secrets.get(VertexEnvFields.GEMINI_API_KEY.value)
         self.embedding_model = TextEmbeddingModel.from_pretrained(
-            self.config.embedding_model_name
+            self.EMBEDDING_MODEL_NAME
         )
-        vertexai.init(project=self.config.project_id, location=self.config.region)
+
+        service_id = secrets.secrets.get(VertexEnvFields.SERVICE_ID.value)
+        assert service_id is not None, "Service ID is not set"
+        service_file = await secrets_manager.get_secret_file(
+            self.DEFAULT_ITEM_NAME, service_id
+        )
+        service_credentials = await self.__init_service_account(service_file)
+        vertexai.init(
+            project=self.project_id,
+            location=self.region,
+            credentials=service_credentials,
+        )
+
+    async def __init_service_account(
+        self, service_id: str
+    ) -> service_account.Credentials:
+        creds_info = orjson.loads(service_id)
+        credentials = service_account.Credentials.from_service_account_info(creds_info)  # type: ignore
+        return credentials
 
     @property
     def provider(self) -> Provider[Any]:
-        return GoogleVertexProvider(project_id=self.config.project_id)
+        return GoogleVertexProvider(project_id=self.project_id)
 
     @property
     def provider_name(self) -> KnownModelName:
@@ -201,7 +92,7 @@ class VertexLLM(ProviderBase):
 
     async def generate_multimodal(self, prompt: str, image: bytes):  # type: ignore
         client = vertexai.generative_models.GenerativeModel(
-            model_name="gemini-2.5-flash-preview-04-17",
+            model_name=self.VERTEX_LITE_MODEL,
         )
         part_1_bytes = vertexai.generative_models.Image.from_bytes(image)
         part_1 = vertexai.generative_models.Part.from_image(part_1_bytes)
@@ -219,7 +110,7 @@ class VertexLLM(ProviderBase):
 
     async def generate_text(self, prompt: str):
         client = vertexai.generative_models.GenerativeModel(
-            model_name="gemini-2.5-flash-preview-04-17",
+            model_name=self.VERTEX_LITE_MODEL,
         )
         response = client.generate_content(
             contents=[
@@ -244,6 +135,7 @@ class VertexLLM(ProviderBase):
                 "Content is not a list of strings"
             )
             assert task_type is not None, "Task type is not set"
+            assert self.embedding_model is not None, "Embedding model is not set"
         except AssertionError as e:
             raise ValueError("Invalid content or dimensionality") from e
 
@@ -252,7 +144,7 @@ class VertexLLM(ProviderBase):
         ]
 
         embeddings = self.embedding_model.get_embeddings(
-            texts=inputs, output_dimensionality=self.config.dimensionality
+            texts=inputs, output_dimensionality=self.DIMENSIONALITY
         )
         try:
             assert embeddings
@@ -269,3 +161,20 @@ class VertexLLM(ProviderBase):
         if len(return_array) == 1:
             return return_array[0]
         return return_array
+
+
+class LLMFactory:
+    _instance: VertexLLM | None = None
+    _lock = asyncio.Lock()
+
+    @classmethod
+    async def get_instance(cls) -> VertexLLM:
+        if cls._instance is None:
+            async with cls._lock:
+                if cls._instance is None:
+                    cls._instance = await VertexLLM.create()
+        return cls._instance
+
+    @classmethod
+    def reset_instance(cls):
+        cls._instance = None

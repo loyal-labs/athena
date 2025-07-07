@@ -9,21 +9,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.router import api_router
-from src.containers import (
-    Container,
-    create_container,
-    init_service,
-    init_service_and_register,
-)
+from src.containers import Container, create_container, init_factory, init_service
 
 logger = logging.getLogger("athena.main-app-component")
-
-# --- Event Loop Initialization ---
-uvloop.install()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
     logger.info("Starting up the application")
 
     # --- Container Initialization ---
@@ -36,39 +29,29 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     key_service_init_tasks = [
         init_service(container, "observability"),
-        init_service(container, "event_bus"),
         init_service(container, "disk_cache_instance"),
         # services with secrets
-        init_service(container, "telegram_object", secrets_manager),
-        # init_service(container, "db", secrets_manager),
+        init_factory(container, "telegram_factory"),
+        init_factory(container, "db_factory"),
+        init_factory(container, "llm_factory"),
     ]
     (
         _,
-        event_bus,
         _,
-        telegram,
-        # db,
+        _,
+        db,
+        _,
     ) = await asyncio.gather(*key_service_init_tasks)
 
     # --- Service Initialization ---
     try:
         logger.debug("Initializing services")
         # --- Telegram ---
-        message_handlers = container.message_handlers()
+
+        # message_handlers = container.message_handlers()
         # await telegram.start(handlers=message_handlers.message_handlers)  # type: ignore
 
         # --- Database ---
-
-        async_init_tasks = [
-            init_service_and_register(container.messages_service, event_bus),
-            init_service_and_register(container.posts_service, event_bus),
-        ]
-
-        async_tasks = [
-            *async_init_tasks,
-        ]
-
-        await asyncio.gather(*async_tasks)
 
         logger.debug("Services initialized")
     except Exception as e:
@@ -81,11 +64,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("Shutting down the application")
 
     # --- Database Shutdown ---
-    # try:
-    #     await db.close()
-    # except Exception as e:
-    #     logger.exception("Error closing database")
-    #     raise e
+    try:
+        await db.close()
+    except Exception as e:
+        logger.exception("Error closing database")
+        raise e
 
     logger.info("Application stopped")
 

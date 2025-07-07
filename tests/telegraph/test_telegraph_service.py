@@ -1,5 +1,4 @@
-import json
-
+import orjson
 import pytest
 from dotenv import load_dotenv
 from pydantic import HttpUrl
@@ -31,7 +30,7 @@ async def test_telegraph_service(
     page_json = page.model_dump()
 
     with open(f"{PATH_TO_FIXTURES}/{expected_fixture}") as f:
-        expected_page_json = json.load(f)
+        expected_page_json = orjson.loads(f.read())
 
     entries_to_check = ["path", "url", "title", "description", "image_url", "content"]
     for entry in entries_to_check:

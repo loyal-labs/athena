@@ -5,21 +5,15 @@ from pathlib import Path
 from typing import Any
 
 from dependency_injector import containers, providers
-from pyrogram.client import Client
 
 from src.shared.base import BaseService
-from src.shared.base_llm import VertexConfig, VertexLLM
+from src.shared.base_llm import LLMFactory
 from src.shared.cache import get_disk_cache
-from src.shared.database import Database
+from src.shared.database import DatabaseFactory
 from src.shared.event_bus import EventBus
 from src.shared.logging_utils import configure_logging
 from src.shared.secrets import OnePasswordManager
-from src.shared.types import SessionFactory
-from src.shared.uow import UnitOfWork
-from src.telegram.bot.client.telegram_bot import TelegramBot
-from src.telegram.bot.messages.messages_handlers import MessageHandlers
-from src.telegram.bot.messages.messages_service import MessagesService
-from src.telemetree.posts.posts_service import PostsService
+from src.telegram.bot.client.telegram_bot import TelegramBotFactory
 
 logger = logging.getLogger("athena.containers")
 
@@ -30,20 +24,7 @@ class Container(containers.DeclarativeContainer):
 
     # # --- DATABASE ---
 
-    db = providers.Singleton(
-        Database,
-    )
-
-    # -- Database Session --
-    db_session_provider = providers.Factory[SessionFactory](
-        lambda db_instance: db_instance.session,  # type: ignore
-        db_instance=db,
-    )
-    # -- Unit of Work --
-    uow_factory = providers.Factory(
-        UnitOfWork,
-        session_factory=db_session_provider,
-    )
+    db_factory = providers.Singleton(DatabaseFactory)
 
     # -- Disk Cache --
     disk_cache_instance = providers.Singleton(get_disk_cache)
@@ -55,20 +36,10 @@ class Container(containers.DeclarativeContainer):
     observability = providers.Factory(configure_logging)
 
     # -- Telegram --
-    telegram_object = providers.Singleton(TelegramBot)
-    telegram_client = providers.Factory[Client](
-        lambda telegram_bot: telegram_bot.get_client(),  # type: ignore
-        telegram_bot=telegram_object,
-    )
+    telegram_factory = providers.Singleton(TelegramBotFactory)
 
     # -- LLM Providers --
-    model_config = providers.Factory(VertexConfig)
-    model_object = providers.Singleton(VertexLLM, config=model_config)
-
-    # -- Telemetree Integrations --
-    message_handlers = providers.Factory(MessageHandlers, event_bus=event_bus)
-    posts_service = providers.Factory(PostsService)
-    messages_service = providers.Factory(MessagesService, event_bus=event_bus)
+    llm_factory = providers.Singleton(LLMFactory)
 
 
 def find_modules_in_packages(packages_paths: list[str]) -> list[str]:
@@ -133,19 +104,45 @@ def create_container() -> Container:
     return container
 
 
+async def init_factory(container: Container, name: str) -> Any:
+    """
+    Initializes a factory.
+    """
+    factory_dict = {
+        "db_factory": container.db_factory,
+        "llm_factory": container.llm_factory,
+        "telegram_factory": container.telegram_factory,
+    }
+
+    assert name is not None, "Factory name is not set"
+    assert name in factory_dict, f"Factory {name} not found in container"
+
+    try:
+        logger.debug("Initializing factory %s", name)
+
+        factory_object = factory_dict[name]()
+        factory = await factory_object.get_instance()
+
+        logger.debug("Initialized factory %s", name)
+        return factory
+    except KeyError as e:
+        raise ValueError("Factory %s not found in container", name) from e
+    except Exception as e:
+        logger.exception("Error initializing factory %s", name)
+        raise e
+
+
 async def init_service(
     container: Container,
     name: str,
-    secrets_manager: OnePasswordManager | None = None,
 ) -> Any:
     """
     Initializes a service.
     """
+
     service_dict = {
         "observability": container.observability,
-        "db": container.db,
         "disk_cache_instance": container.disk_cache_instance,
-        "telegram_object": container.telegram_object,
         "event_bus": container.event_bus,
     }
 
@@ -156,14 +153,6 @@ async def init_service(
         logger.debug("Initializing service %s", name)
         service = service_dict[name]()
         logger.debug("Initialized service %s", name)
-
-        if isinstance(service, TelegramBot):
-            assert secrets_manager is not None, "Secrets manager is not set"
-            service = await service.create(secrets_manager)
-
-        elif isinstance(service, Database):
-            assert secrets_manager is not None, "Secrets manager is not set"
-            service = await service.create(secrets_manager)
 
         return service
     except KeyError as e:

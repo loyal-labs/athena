@@ -1,4 +1,5 @@
 import logging
+import os
 
 import colorlog
 
@@ -13,6 +14,9 @@ LOG_COLORS = {
 
 def configure_logging() -> None:
     console_handler = colorlog.StreamHandler()
+
+    level = os.getenv("LOGGING_LEVEL", "DEBUG").upper()
+    level = getattr(logging, level)
 
     log_format = "%(log_color)s%(levelname)-8s%(reset)s | %(asctime)s | %(name)s:%(funcName)s:%(lineno)d | %(message)s"  # noqa: E501
     date_format = "%Y-%m-%d %H:%M:%S"
@@ -35,7 +39,7 @@ def configure_logging() -> None:
     logging.getLogger("clickhouse_connect").setLevel(logging.INFO)
 
     logging.basicConfig(
-        level=logging.DEBUG,
+        level=level,
         format="%(levelname)-8s | %(asctime)s | %(name)s:%(funcName)s:%(lineno)d | %(message)s",  # noqa: E501
         datefmt=date_format,
         handlers=handlers,
