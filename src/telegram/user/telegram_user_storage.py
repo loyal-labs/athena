@@ -1,5 +1,5 @@
 import time
-from typing import Any, overload
+from typing import Any
 
 from pyrogram import raw, utils
 from pyrogram.client import Client
@@ -233,7 +233,7 @@ class MultiPostgresStorage(Storage):
 
             await session.commit()
 
-    async def get_peer_by_id(self, peer_id_or_username: int | str):
+    async def get_peer_by_id(self, peer_id_or_username: int | str):  # type: ignore
         assert self.database is not None, "Database is not initialized"
         assert isinstance(self.database, Database), (
             "Database is not a Database instance"
@@ -268,7 +268,7 @@ class MultiPostgresStorage(Storage):
                         col(UsernameModel.session_name) == self.name,
                         col(PeerModel.session_name) == self.name,
                     )
-                    .order_by(PeerModel.last_update_on.desc())
+                    .order_by(PeerModel.last_update_on.desc())  # type: ignore
                 )
                 r = r.fetchone()
                 if r is None:
@@ -305,7 +305,7 @@ class MultiPostgresStorage(Storage):
                     col(username_alias.username) == username,
                     col(username_alias.session_name) == self.name,
                 )
-                .order_by(peer_alias.last_update_on.desc())
+                .order_by(peer_alias.last_update_on.desc())  # type: ignore
             )
             r = r.fetchone()
             if r is None:
@@ -314,7 +314,7 @@ class MultiPostgresStorage(Storage):
             peer_id, access_hash, peer_type, _ = r
             return get_input_peer(peer_id, access_hash, peer_type)
 
-    async def update_state(
+    async def update_state(  # type: ignore
         self, value: tuple[int, int, int, int, int] | int | type[object] = object
     ):
         assert self.database is not None, "Database is not initialized"
@@ -381,7 +381,7 @@ class MultiPostgresStorage(Storage):
             if r is None:
                 raise KeyError(f"Phone number not found: {phone_number}")
 
-            return get_input_peer(r.id, r.access_hash, r.type)
+            return get_input_peer(r.id, r.access_hash, r.type)  # type: ignore
 
     async def _get(self, attr: str):
         assert self.database is not None, "Database is not initialized"

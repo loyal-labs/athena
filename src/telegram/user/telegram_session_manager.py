@@ -1,7 +1,5 @@
 import asyncio
-import base64
 import logging
-import struct
 from collections import OrderedDict
 from datetime import datetime, timedelta
 
@@ -13,6 +11,7 @@ from src.telegram.user.telegram_user_client import TelegramUser
 logger = logging.getLogger("athena.telegram.user.session_manager")
 
 
+# TODO: Move to redis setup later on.
 class UserSessionManager:
     """
     Manages multiple Telegram user sessions with LRU eviction and database persistence.
@@ -141,24 +140,24 @@ class UserSessionManager:
         owner_id: int,
         dc_id: int,
         auth_key: bytes,
-        user_id: int,
         db_session: AsyncSession,
     ) -> TelegramUser:
         """
         Create a completely new session and save to database.
 
+        Starts the session and caches it in memory.
+
         Args:
-            owner_id: The owner ID for the session
+            owner_id: The Telegram ID for the user
             dc_id: Telegram data center ID
             auth_key: Authentication key (256 bytes)
-            user_id: Telegram user ID
             db_session: Database session
 
         Returns:
             TelegramUser instance
         """
         # Create TelegramUser instance
-        user_session = await TelegramUser.create(dc_id, auth_key, user_id)
+        user_session = await TelegramUser.create(dc_id, auth_key, owner_id)
 
         # Save to database
         assert user_session.session_string is not None, "Session string is None"
@@ -192,28 +191,8 @@ class UserSessionManager:
 
     async def _create_session_from_string(self, session_string: str) -> TelegramUser:
         """Create a TelegramUser instance from a session string."""
-        # Decode session string to get components
-        dc_id, _, _, auth_key, user_id, _ = self._decode_session_string(session_string)
 
-        # Create TelegramUser with decoded values
-        return await TelegramUser.create(dc_id, auth_key, user_id)
-
-    def _decode_session_string(self, session_string: str):
-        """Decode a Pyrogram session string."""
-        # Add padding if needed
-        padding = 4 - len(session_string) % 4
-        if padding != 4:
-            session_string += "=" * padding
-
-        # Decode from base64
-        decoded = base64.urlsafe_b64decode(session_string)
-
-        # Unpack the binary data
-        dc_id, api_id, test_mode, auth_key, user_id, is_bot = struct.unpack(
-            ">BI?256sQ?", decoded
-        )
-
-        return dc_id, api_id, test_mode, auth_key, user_id, is_bot
+        return await TelegramUser.create_from_session_string(session_string)
 
     async def _evict_lru_session(self):
         """Remove the least recently used session."""

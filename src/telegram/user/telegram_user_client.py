@@ -40,6 +40,26 @@ class TelegramUser:
 
         return self
 
+    @classmethod
+    async def create_from_session_string(cls, session_string: str):
+        """Asynchronously creates a Telegram user client from a session string."""
+        secrets_manager = await SecretsFactory.get_instance()
+
+        self = cls()
+        await self.__init_session_from_string(secrets_manager, session_string)
+        await self.__init_client()
+        return self
+
+    async def __init_session_from_string(
+        self, secrets_manager: OnePasswordManager, session_string: str
+    ):
+        telegram_client_secret = await secrets_manager.get_secret_item(
+            self.default_item_value
+        )
+        self.api_id = telegram_client_secret.get(self.api_id_value)
+        self.api_hash = telegram_client_secret.get(self.api_hash_value)
+        self.session_string = session_string
+
     async def __init_session(
         self,
         secrets_manager: OnePasswordManager,
