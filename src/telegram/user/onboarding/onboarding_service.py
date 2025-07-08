@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import time
 from datetime import datetime
@@ -11,6 +12,12 @@ from src.shared.base import BaseService
 from src.shared.database import DatabaseFactory
 from src.telegram.bot.client.telegram_bot import TelegramBot, TelegramBotFactory
 from src.telegram.user.login.login_schemas import LoginSession
+from src.telegram.user.onboarding.onboarding_texts import (
+    WELCOME_MESSAGE_1,
+    WELCOME_MESSAGE_2,
+    WELCOME_MESSAGE_3,
+    WELCOME_MESSAGE_4,
+)
 from src.telegram.user.summary.summary_schemas import TelegramEntity
 from src.telegram.user.summary.summary_service import SummaryService
 from src.telegram.user.telegram_session_manager import UserSessionFactory
@@ -44,11 +51,15 @@ class OnboardingService(BaseService):
                 user_client = user_client_object.get_client()
 
                 # Step 1: Send welcome message
-                await self._send_welcome_message(bot, owner_id)
+                welcome_message_task = self._send_welcome_message(bot, owner_id)
 
                 # Step 2: Analyze interests
-                interests = await self._analyze_interests(
+                interests_task = self._analyze_interests(
                     user_client, summary_service, db_session
+                )
+
+                _, interests = await asyncio.gather(
+                    welcome_message_task, interests_task
                 )
 
                 # Step 3: Send personalized message based on interests
@@ -65,41 +76,19 @@ class OnboardingService(BaseService):
         """Send initial welcome message."""
         client = bot.get_client()
 
-        message_1 = """
-hi! it's a pleasure to meet you! 
-        """
-
-        message_2 = """
-bear with me, i need a minute to go over your chats to grasp your interests and the best way I can help you.
-        """
-
-        blog_link = (
-            "https://telegra.ph/Welcome-Let-me-tell-you-a-bit-about-myself-07-08"
-        )
-        blog_hyperlink = f"<a href='{blog_link}'>\u200b</a>"
-        message_3 = f"""
-here's something i prepared for you while you're waiting. it's a short gist of who i am and things i can do!
-
-hope you like it {blog_hyperlink} 👉🏻👈🏻 
-        """
-
-        message_4 = """
-ok, let me get back to your messages though. i'll be back in a second.
-        """
-
         await client.send_chat_action(owner_id, ChatAction.TYPING)
         time.sleep(0.25)
-        await client.send_message(owner_id, message_1)
+        await client.send_message(owner_id, WELCOME_MESSAGE_1)
         await client.send_chat_action(owner_id, ChatAction.TYPING)
         time.sleep(2)
 
-        await client.send_message(owner_id, message_2)
+        await client.send_message(owner_id, WELCOME_MESSAGE_2)
         await client.send_chat_action(owner_id, ChatAction.TYPING)
         time.sleep(4)
 
-        await client.send_message(owner_id, message_3)
+        await client.send_message(owner_id, WELCOME_MESSAGE_3)
         time.sleep(1)
-        await client.send_message(owner_id, message_4)
+        await client.send_message(owner_id, WELCOME_MESSAGE_4)
         await client.send_chat_action(owner_id, ChatAction.TYPING)
 
     async def _analyze_interests(
