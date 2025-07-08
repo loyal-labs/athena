@@ -55,9 +55,7 @@ class VertexLLM:
         self.project_id = secrets.secrets.get(VertexEnvFields.PROJECT_ID.value)
         self.region = secrets.secrets.get(VertexEnvFields.REGION.value)
         self.gemini_api_key = secrets.secrets.get(VertexEnvFields.GEMINI_API_KEY.value)
-        self.embedding_model = TextEmbeddingModel.from_pretrained(
-            self.EMBEDDING_MODEL_NAME
-        )
+        logger.debug("Initialized project ID, region, and Gemini API key")
 
         service_id = secrets.secrets.get(VertexEnvFields.SERVICE_ID.value)
         assert service_id is not None, "Service ID is not set"
@@ -65,11 +63,18 @@ class VertexLLM:
             self.DEFAULT_ITEM_NAME, service_id
         )
         service_credentials = await self.__init_service_account(service_file)
+        logger.debug("Initialized service account")
         vertexai.init(
             project=self.project_id,
             location=self.region,
             credentials=service_credentials,
         )
+        logger.debug("Initialized Vertex AI")
+
+        self.embedding_model = TextEmbeddingModel.from_pretrained(
+            self.EMBEDDING_MODEL_NAME
+        )
+        logger.debug("Initialized embedding model")
 
     async def __init_service_account(
         self, service_id: str

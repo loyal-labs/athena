@@ -25,6 +25,18 @@ logger = getLogger("telegram.user.summary.summary_service")
 
 
 class SummaryService:
+    async def mark_as_read(
+        self, client: Client, chat_id: int, max_id: int | None = None
+    ) -> None:
+        assert client is not None, "Client is required"
+        assert isinstance(client, Client), "Client must be an instance of Client"
+        assert chat_id is not None, "Chat ID is required"
+
+        if max_id is None:
+            await client.read_chat_history(chat_id)
+        else:
+            await client.read_chat_history(chat_id, max_id=max_id)
+
     async def isolate_interests(self, client: Client) -> pd.DataFrame:
         """
         Isolate interests from the dialogs.

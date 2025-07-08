@@ -78,3 +78,22 @@ class ChatSummary(Entity):
 
     chat_type: ChatTypes = Field(..., description="Chat type")
     topics: list[ChatSummaryTopic] = Field(..., description="Topics of the chat")
+
+
+class ChatSummaryResponse(BaseModel):
+    """
+    Chat summary response is a list of chats.
+    """
+
+    total_chats: int = Field(..., description="Total chats with unread messages")
+    selected_chats: list[int] = Field(..., description="Selected chats")
+    chats: list[ChatSummary] = Field(..., description="Chats")
+
+
+class MarkAsReadRequest(BaseModel):
+    """
+    Mark as read request is a request to mark a chat as read.
+    """
+
+    chat_id: int = Field(..., description="Chat ID")
+    max_id: int | None = Field(None, description="Max ID")
