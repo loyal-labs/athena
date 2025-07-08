@@ -1,9 +1,10 @@
 import logging
+import time
 from datetime import datetime
 
 import pandas as pd
 from pyrogram.client import Client
-from pyrogram.enums import ParseMode
+from pyrogram.enums import ChatAction, ParseMode
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.shared.base import BaseService
@@ -64,12 +65,42 @@ class OnboardingService(BaseService):
         """Send initial welcome message."""
         client = bot.get_client()
 
-        await client.send_message(
-            owner_id,
-            "Hi! I'm Athena, your personal assistant.\n\n"
-            "I'm analyzing your chats to understand your interests better, give me a few minutes to do that.\n\n"
-            "I'll let you know when I'm done.",
+        message_1 = """
+hi! it's a pleasure to meet you! 
+        """
+
+        message_2 = """
+bear with me, i need a minute to go over your chats to grasp your interests and the best way I can help you.
+        """
+
+        blog_link = (
+            "https://telegra.ph/Welcome-Let-me-tell-you-a-bit-about-myself-07-08"
         )
+        blog_hyperlink = f"<a href='{blog_link}'>\u200b</a>"
+        message_3 = f"""
+here's something i prepared for you while you're waiting. it's a short gist of who i am and things i can do!
+
+hope you like it {blog_hyperlink} 👉🏻👈🏻 
+        """
+
+        message_4 = """
+ok, let me get back to your messages though. i'll be back in a second.
+        """
+
+        await client.send_chat_action(owner_id, ChatAction.TYPING)
+        time.sleep(0.25)
+        await client.send_message(owner_id, message_1)
+        await client.send_chat_action(owner_id, ChatAction.TYPING)
+        time.sleep(2)
+
+        await client.send_message(owner_id, message_2)
+        await client.send_chat_action(owner_id, ChatAction.TYPING)
+        time.sleep(4)
+
+        await client.send_message(owner_id, message_3)
+        time.sleep(1)
+        await client.send_message(owner_id, message_4)
+        await client.send_chat_action(owner_id, ChatAction.TYPING)
 
     async def _analyze_interests(
         self,
@@ -102,20 +133,27 @@ class OnboardingService(BaseService):
         private = interests[interests["chat_type"] == "PRIVATE"].shape[0]
 
         message = f"""
-        ✨ <b>Your Telegram Analysis</b>
+✨ <b>Your Telegram Analysis</b>
 
         📊 Total chats of interest: {total_chats}
         👥 Groups of interest: {groups}
         📢 Channels of interest: {channels}
         💬 Private chats of interest: {private}
 
-        🔥 <b>Your Most Active Chats:</b>
-        """
+🔥 <b>Your Most Active Chats:</b>"""
         most_active_chats = interests.head(5)
-        for i, chat in most_active_chats.iterrows():  # type: ignore
-            chat_type = chat["chat_type"].lower()  # type: ignore
+        position = 1
+        for _, chat in most_active_chats.iterrows():  # type: ignore
             chat_title = chat["title"]  # type: ignore
-            message += f"{i}. {chat_title} ({chat_type})\n"
+            rating = chat["rating"]  # type: ignore
+
+            username = chat["username"]  # type: ignore
+
+            if username:
+                chat_title = f"<a href='https://t.me/{username}'>{chat_title}</a>"
+
+            message += f"\n{position}. {chat_title} ({rating:.2f} points)"
+            position += 1
 
         message += "\nI'll help you stay on top of important conversations!"
 

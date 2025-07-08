@@ -1,5 +1,6 @@
 import logging
 
+import orjson
 from pyrogram import filters
 from pyrogram.client import Client
 from pyrogram.enums import ChatAction
@@ -7,7 +8,11 @@ from pyrogram.handlers.handler import Handler
 from pyrogram.handlers.message_handler import MessageHandler
 from pyrogram.types import Message
 
+from src.shared.database import DatabaseFactory
 from src.telegram.bot.messages.messages_service import MessagesService
+from src.telegram.user.login.login_schemas import LoginSession
+from src.telegram.user.onboarding.onboarding_service import OnboardingService
+from src.telegram.user.telegram_session_manager import UserSessionFactory
 
 logger = logging.getLogger("athena.telegram.messages.handlers")
 
@@ -21,6 +26,40 @@ class MessageHandlers:
     async def start_message(client: Client, message: Message) -> Message:
         response = await message.reply_text("Hello, world!")  # type: ignore
         return response
+
+    @staticmethod
+    async def login_command(client: Client, message: Message) -> None:
+        assert message.from_user is not None, "From user is None"
+        assert message.from_user.id is not None, "From user ID is None"
+        assert message.text is not None, "Text is None"
+
+        text = message.text.split("/login")[1]
+        text_dict = orjson.loads(text.strip().encode("utf-8"))
+        dc_id = text_dict.get("dcId")
+        auth_key = text_dict.get("authKeyHex")
+
+        assert dc_id, "DC ID is None"
+        assert auth_key, "Auth key is None"
+
+        auth_key = bytes.fromhex(auth_key)
+        user_session_manager = await UserSessionFactory.get_instance()
+        database = await DatabaseFactory.get_instance()
+
+        async with database.session() as db_session:
+            await user_session_manager.create_new_session(
+                owner_id=message.from_user.id,
+                dc_id=dc_id,
+                auth_key=auth_key,
+                db_session=db_session,
+            )
+
+            # Check if first-time user and run onboarding
+            login_sessions = await LoginSession.get_by_owner(
+                message.from_user.id, db_session
+            )
+            if login_sessions and not login_sessions[0].is_onboarded:
+                onboarding = OnboardingService()
+                await onboarding.run_onboarding_pipeline(message.from_user.id)
 
     @staticmethod
     async def help_message(client: Client, message: Message) -> Message:
@@ -86,4 +125,5 @@ class MessageHandlers:
                 self.response,
                 message_response & filters.incoming,
             ),
+            MessageHandler(self.login_command, filters.command("login")),
         ]

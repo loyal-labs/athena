@@ -14,6 +14,7 @@ from src.shared.event_bus import EventBus
 from src.shared.logging_utils import configure_logging
 from src.shared.secrets import OnePasswordManager
 from src.telegram.bot.client.telegram_bot import TelegramBotFactory
+from src.telegram.bot.messages.messages_handlers import MessageHandlers
 
 logger = logging.getLogger("athena.containers")
 
@@ -37,6 +38,7 @@ class Container(containers.DeclarativeContainer):
 
     # -- Telegram --
     telegram_factory = providers.Singleton(TelegramBotFactory)
+    messages_handlers = providers.Singleton(MessageHandlers)
 
     # -- LLM Providers --
     llm_factory = providers.Singleton(LLMFactory)

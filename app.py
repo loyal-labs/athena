@@ -38,7 +38,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     (
         _,
         _,
-        _,
+        telegram,
         db,
         _,
     ) = await asyncio.gather(*key_service_init_tasks)
@@ -48,8 +48,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         logger.debug("Initializing services")
         # --- Telegram ---
 
-        # message_handlers = container.message_handlers()
-        # await telegram.start(handlers=message_handlers.message_handlers)  # type: ignore
+        message_handlers = container.messages_handlers()
+        await telegram.start(handlers=message_handlers.message_handlers)
 
         # --- Database ---
 
