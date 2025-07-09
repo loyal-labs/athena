@@ -49,7 +49,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         # --- Telegram ---
 
         message_handlers = container.messages_handlers()
-        await telegram.start(handlers=message_handlers.message_handlers)
+        login_handlers = container.login_handlers()
+        handlers = login_handlers.login_handlers + message_handlers.message_handlers
+        await telegram.start(handlers=handlers)
 
         # --- Database ---
 

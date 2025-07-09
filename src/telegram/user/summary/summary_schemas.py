@@ -315,6 +315,16 @@ class ChatMessage(SQLModel, table=True):
         return result.scalar_one_or_none()
 
     @classmethod
+    async def get_all_for_owner(
+        cls, owner_id: int, session: AsyncSession
+    ) -> list["ChatMessage"]:
+        """Get all ChatMessage records for a specific owner."""
+        result = await session.execute(
+            select(cls).where(cls.owner_id == owner_id).order_by(cls.timestamp.desc())  # type: ignore
+        )
+        return list(result.scalars().all())
+
+    @classmethod
     async def get_messages_for_chat(
         cls,
         owner_id: int,
@@ -359,6 +369,8 @@ class ChatSummary(SQLModel, table=True):
         sa_type=JSON, description="JSON array of topics with points"
     )
 
+    is_read: bool = Field(default=False)
+    is_processed: bool = Field(default=False)
     created_at: datetime = Field(default_factory=datetime.now)
 
     # Relationship to TelegramEntity
@@ -421,6 +433,53 @@ class ChatSummary(SQLModel, table=True):
         )
 
         return list(result.scalars().all())
+
+    @classmethod
+    async def get_processed_for_owner(
+        cls, owner_id: int, session: AsyncSession, limit: int | None = None
+    ) -> list["ChatSummary"]:
+        """Get processed ChatSummary records for a specific owner."""
+        query = (
+            select(cls)
+            .where(cls.owner_id == owner_id, cls.is_processed == True)
+            .order_by(cls.created_at.asc())  # type: ignore
+        )
+
+        if limit:
+            query = query.limit(limit)
+
+        result = await session.execute(query)
+        return list(result.scalars().all())
+
+    @classmethod
+    async def get_unprocessed_for_owner(
+        cls, owner_id: int, session: AsyncSession, limit: int | None = None
+    ) -> list["ChatSummary"]:
+        """Get unprocessed ChatSummary records for a specific owner."""
+        query = (
+            select(cls)
+            .where(cls.owner_id == owner_id, cls.is_processed == False)
+            .order_by(cls.created_at.asc())  # type: ignore
+        )
+
+        if limit:
+            query = query.limit(limit)
+
+        result = await session.execute(query)
+        return list(result.scalars().all())
+
+    @classmethod
+    async def mark_as_processed(
+        cls, owner_id: int, chat_id: int, session: AsyncSession
+    ) -> None:
+        """Mark a ChatSummary as processed."""
+        result = await session.execute(
+            select(cls).where(cls.owner_id == owner_id, cls.chat_id == chat_id)
+        )
+        summary = result.scalar_one_or_none()
+        if summary:
+            summary.is_processed = True
+            await session.commit()
 
     async def insert(self, session: AsyncSession) -> "ChatSummary":
         """Insert a single ChatSummary into the database."""

@@ -9,6 +9,13 @@ from sqlmodel import SQLModel
 from alembic import context
 from src.shared.database import DatabaseFactory
 from src.telegram.user.login.login_schemas import LoginSession
+from src.telegram.user.storage.storage_schema import (
+    TelegramPeers,
+    TelegramSessions,
+    TelegramUpdateState,
+    TelegramUsernames,
+    TelegramVersion,
+)
 from src.telegram.user.summary.summary_schemas import (
     ChatMessage,
     ChatSummary,

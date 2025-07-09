@@ -86,7 +86,6 @@ class ChatSummaryResponse(BaseModel):
     """
 
     total_chats: int = Field(..., description="Total chats with unread messages")
-    selected_chats: list[int] = Field(..., description="Selected chats")
     chats: list[ChatSummary] = Field(..., description="Chats")
 
 

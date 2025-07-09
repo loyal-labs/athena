@@ -1,4 +1,5 @@
 import logging
+from typing import cast
 
 import orjson
 from pyrogram import filters
@@ -11,7 +12,7 @@ from pyrogram.types import Message, WebAppData
 from src.shared.database import DatabaseFactory
 from src.telegram.user.login.login_schemas import LoginSession
 from src.telegram.user.onboarding.onboarding_service import OnboardingService
-from telegram.user.telegram_session_manager import UserSessionFactory
+from src.telegram.user.telegram_session_manager import UserSessionFactory
 
 logger = logging.getLogger("athena.telegram.login.handlers")
 
@@ -21,13 +22,18 @@ class LoginHandlers:
     Login handlers class
     """
 
-    def _parse_web_app_data(self, web_app_data: WebAppData) -> tuple[int, bytes]:
+    DC_ID_NAME = "dcId"
+    AUTH_KEY_NAME = "authKeyHex"
+
+    @staticmethod
+    def _parse_web_app_data(web_app_data: WebAppData) -> tuple[int, bytes]:
         assert web_app_data is not None, "Web app data is None"
         assert web_app_data.data is not None, "Web app data is None"
 
-        web_app_data_str = web_app_data.data
+        web_app_data_service_msg_content = web_app_data.data
+        web_app_data_str = cast(str, web_app_data_service_msg_content.data)  # type: ignore
         try:
-            data_dict = orjson.loads(web_app_data_str)
+            text_dict = orjson.loads(web_app_data_str.strip().encode("utf-8"))
         except orjson.JSONDecodeError as e:
             logger.error("Failed to parse web_app_data: %s", web_app_data_str)
             raise ValueError(f"Failed to parse web_app_data: {web_app_data_str}") from e
@@ -35,14 +41,23 @@ class LoginHandlers:
             logger.error("Failed to parse web_app_data: %s", e)
             raise ValueError(f"Failed to parse web_app_data: {e}") from e
 
-        dc_id = data_dict.get("dc_id")
-        auth_key = data_dict.get("auth_key")
-        assert dc_id
-        assert auth_key
+        dc_id = text_dict.get(LoginHandlers.DC_ID_NAME)
+        auth_key = text_dict.get(LoginHandlers.AUTH_KEY_NAME)
+
+        assert dc_id, "DC ID is None"
+        assert auth_key, "Auth key is None"
+
+        try:
+            dc_id = int(dc_id)
+            auth_key = bytes.fromhex(auth_key)
+        except ValueError as e:
+            logger.error("Failed to parse web_app_data: %s", e)
+            raise ValueError(f"Failed to parse web_app_data: {e}") from e
 
         return dc_id, auth_key
 
-    async def shared_data_filter(self, _, client: Client, message: Message) -> bool:
+    @staticmethod
+    async def shared_data_filter(_, client: Client, message: Message) -> bool:
         if (
             message.service is not None
             and message.service == MessageServiceType.WEB_APP_DATA
@@ -50,12 +65,13 @@ class LoginHandlers:
             return True
         return False
 
-    async def login_message(self, client: Client, message: Message) -> None:
+    @staticmethod
+    async def login_message(client: Client, message: Message) -> None:
         assert message.web_app_data is not None, "Web app data is None"
         assert message.from_user is not None, "From user is None"
         assert message.from_user.id is not None, "From user ID is None"
 
-        dc_id, auth_key = self._parse_web_app_data(message.web_app_data)
+        dc_id, auth_key = LoginHandlers._parse_web_app_data(message.web_app_data)
 
         user_session_manager = await UserSessionFactory.get_instance()
         database = await DatabaseFactory.get_instance()
@@ -78,8 +94,10 @@ class LoginHandlers:
 
     @property
     def login_handlers(self) -> list[Handler]:
-        shared_data_filter = filters.create(self.shared_data_filter)  # type: ignore
+        shared_data_filter = filters.create(LoginHandlers.shared_data_filter)  # type: ignore
 
         return [
-            MessageHandler(self.login_message, filters.incoming & shared_data_filter),
+            MessageHandler(
+                LoginHandlers.login_message, filters.incoming & shared_data_filter
+            ),
         ]

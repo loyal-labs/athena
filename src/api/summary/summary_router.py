@@ -1,14 +1,17 @@
 import random
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 
+from src.api.summary.summary_constants import BATCH_SIZE
 from src.api.summary.summary_schemas import (
     ChatSummary,
+    ChatSummaryResponse,
     ChatSummaryTopic,
     ChatTypes,
     MarkAsReadRequest,
 )
+from src.api.summary.summary_service import get_chats_for_summaries
 from src.shared.database import Database
 from src.shared.dependencies import (
     TelegramLoginParams,
@@ -16,64 +19,43 @@ from src.shared.dependencies import (
     verify_telegram_auth,
 )
 from src.telegram.user.summary.summary_schemas import ChatSummary as TelegramChatSummary
+from src.telegram.user.summary.summary_schemas import TelegramEntity
 from src.telegram.user.summary.summary_service import SummaryService
 from src.telegram.user.telegram_session_manager import UserSessionFactory
 
 router = APIRouter()
 
 
-@router.get("/", response_model=list[ChatSummary])
+@router.get("/", response_model=ChatSummaryResponse)
 async def get_chat_summary(
-    params: Annotated[TelegramLoginParams, Depends(verify_telegram_auth)],
+    background_tasks: BackgroundTasks,
+    # params: Annotated[TelegramLoginParams, Depends(verify_telegram_auth)],
     db: Annotated[Database, Depends(get_database)],
-) -> list[ChatSummary]:
+    offset: int = Query(0, description="Number of summaries already returned"),
+) -> ChatSummaryResponse:
     """
-    Get the chat summary for the current user.
+    Get chat summaries with lazy loading.
+    Initial request returns 2 summaries and starts processing more.
+    Subsequent requests return pre-processed summaries.
     """
-    owner_id = int(params.id)
+    owner_id = 714862471
     pictures = ["https://github.com/shadcn.png", "https://github.com/leerob.png"]
 
     async with db.session() as session:
-        # Fetch summaries from database
-        db_summaries = await TelegramChatSummary.get_all_for_owner(owner_id, session)
-
-        # Transform to API response format
-        api_summaries: list[ChatSummary] = []
-        for db_summary in db_summaries:
-            selected_picture = random.choice(pictures)
-            # Transform topics to API format
-            api_topics: list[ChatSummaryTopic] = []
-            for topic in db_summary.topics:
-                api_topics.append(
-                    ChatSummaryTopic(
-                        topic=topic["topic"],
-                        date=topic["date"],
-                        points=topic["points"],  # Already in correct format
-                    )
-                )
-
-            api_summaries.append(
-                ChatSummary(
-                    name=db_summary.name,
-                    profile_picture=selected_picture,
-                    chat_type=ChatTypes.from_telegram_type(db_summary.chat_type),
-                    topics=api_topics,
-                )
-            )
-
-        return api_summaries
+        # Get total unread chats count, sorted by least messages first
+        all_entities = await get_chats_for_summaries(owner_id, session)
 
 
 @router.post("/read")
 async def mark_as_read(
     request: MarkAsReadRequest,
-    params: Annotated[TelegramLoginParams, Depends(verify_telegram_auth)],
+    # params: Annotated[TelegramLoginParams, Depends(verify_telegram_auth)],
     db: Annotated[Database, Depends(get_database)],
 ) -> None:
     """
     Mark a chat as read.
     """
-    owner_id = int(params.id)
+    owner_id = 714862471
     session_manager = await UserSessionFactory.get_instance()
 
     async with db.session() as session:
