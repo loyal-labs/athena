@@ -126,6 +126,9 @@ class SummaryService:
         assert isinstance(client, Client), "Client must be an instance of Client"
         assert chat_id is not None, "Chat ID is required"
 
+        unread_count_context_offset = 20
+        unread_count_no_offset_limit = 100
+
         owner_id = client.me.id
         get_chat = await client.get_chat(chat_id)
         unread_count = get_chat.unread_count
@@ -133,6 +136,9 @@ class SummaryService:
             return []
 
         response_messages: list[TelegramMessage] = []
+
+        if unread_count < unread_count_no_offset_limit:
+            unread_count += unread_count_context_offset
 
         async for message in client.get_chat_history(chat_id, limit=unread_count):
             msg_obj = TelegramMessage.extract_chat_message_info(
@@ -176,7 +182,6 @@ class SummaryService:
         assert isinstance(client, Client), "Client must be an instance of Client"
         assert day_offset > 0, "Day offset must be greater than 0"
         await client.resolve_peer("me")
-        print(client.me)
 
         start_date = datetime.now()
         stop_date = start_date - timedelta(days=day_offset)

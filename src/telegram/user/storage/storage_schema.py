@@ -166,11 +166,25 @@ class TelegramPeers(SQLModel, table=True):
 
         # Prepare the data
         value_dicts = [value.model_dump() for value in values]
+        # Prepare the data
+        value_dicts = [value.model_dump() for value in values]
+        seen: set[tuple[int, int]] = set()
+        unique_peers: list[dict[str, Any]] = []
+
+        for value in value_dicts:
+            if value["owner_id"] is None or value["id"] is None:
+                logger.debug(f"Invalid owner_id or id: {value}")
+                continue
+
+            key = (value["owner_id"], value["id"])
+            if key not in seen:
+                seen.add(key)
+                unique_peers.append(value)
 
         # Create insert statement with ON CONFLICT
-        insert_statement = pg_insert(cls).values(value_dicts)
+        insert_statement = pg_insert(cls).values(unique_peers)
 
-        # Option 1: Update all fields on conflict
+        # Update all fields on conflict
         upsert_statement = insert_statement.on_conflict_do_update(
             index_elements=["owner_id", "id"],  # The composite key columns
             set_={

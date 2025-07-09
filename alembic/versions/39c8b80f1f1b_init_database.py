@@ -1,8 +1,8 @@
-"""Init table
+"""Init database
 
-Revision ID: 8084e0cde436
+Revision ID: 39c8b80f1f1b
 Revises: 
-Create Date: 2025-07-09 04:44:01.905590
+Create Date: 2025-07-09 06:07:16.594084
 
 """
 from typing import Sequence, Union
@@ -13,7 +13,7 @@ import sqlmodel
 
 
 # revision identifiers, used by Alembic.
-revision: str = '8084e0cde436'
+revision: str = '39c8b80f1f1b'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -90,16 +90,12 @@ def upgrade() -> None:
     op.create_table('telegram_chat_summaries',
     sa.Column('owner_id', sa.BigInteger(), nullable=False),
     sa.Column('chat_id', sa.BigInteger(), nullable=False),
-    sa.Column('summary_date', sa.DateTime(), nullable=False),
-    sa.Column('name', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-    sa.Column('profile_picture', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-    sa.Column('chat_type', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-    sa.Column('topics', sa.JSON(), nullable=False),
+    sa.Column('topics', sa.JSON(), nullable=True),
     sa.Column('is_read', sa.Boolean(), nullable=False),
     sa.Column('is_processed', sa.Boolean(), nullable=False),
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.ForeignKeyConstraint(['owner_id', 'chat_id'], ['telegram_entities.owner_id', 'telegram_entities.chat_id'], ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('owner_id', 'chat_id', 'summary_date')
+    sa.PrimaryKeyConstraint('owner_id', 'chat_id')
     )
     op.create_table('telegram_messages',
     sa.Column('owner_id', sa.BigInteger(), nullable=False),
@@ -110,7 +106,7 @@ def upgrade() -> None:
     sa.Column('message', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('timestamp', sa.DateTime(), nullable=False),
     sa.ForeignKeyConstraint(['owner_id', 'chat_id'], ['telegram_entities.owner_id', 'telegram_entities.chat_id'], ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('owner_id', 'chat_id', 'message_id')
+    sa.PrimaryKeyConstraint('owner_id', 'chat_id', 'message_id', name='pk_telegram_messages')
     )
     op.create_table('telegram_usernames',
     sa.Column('owner_id', sa.BigInteger(), nullable=False),

@@ -4,8 +4,10 @@ from typing import Any
 
 from pyrogram.enums import ChatType
 from pyrogram.types import Chat, Dialog, Message
-from sqlalchemy import JSON, BigInteger, ForeignKeyConstraint
+from sqlalchemy import JSON, BigInteger, ForeignKeyConstraint, PrimaryKeyConstraint
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 from sqlmodel import Field, Relationship, SQLModel, select
 
 logger = getLogger("telegram.user.summary.summary_schemas")
@@ -233,13 +235,15 @@ class TelegramMessage(SQLModel, table=True):
             ["telegram_entities.owner_id", "telegram_entities.chat_id"],
             ondelete="CASCADE",
         ),
+        PrimaryKeyConstraint(
+            "owner_id", "chat_id", "message_id", name="pk_telegram_messages"
+        ),
     )
 
-    owner_id: int = Field(sa_type=BigInteger, primary_key=True)
-    chat_id: int = Field(sa_type=BigInteger, primary_key=True)
-    message_id: int = Field(
-        sa_type=BigInteger, primary_key=True, description="ID of the message"
-    )
+    owner_id: int = Field(sa_type=BigInteger)
+    chat_id: int = Field(sa_type=BigInteger)
+    message_id: int = Field(sa_type=BigInteger, description="ID of the message")
+
     first_name: str | None = Field(None, description="First name of the sender")
     username: str | None = Field(None, description="Username of the sender")
     message: str = Field(description="Message content")
@@ -290,17 +294,32 @@ class TelegramMessage(SQLModel, table=True):
 
     @classmethod
     async def insert_many(
-        cls, messages: list["TelegramMessage"], session: AsyncSession
+        cls,
+        messages: list["TelegramMessage"],
+        session: AsyncSession,
+        commit: bool = True,
     ) -> list["TelegramMessage"]:
         """Insert multiple ChatMessage objects into the database."""
         if not messages:
             return []
 
-        session.add_all(messages)
-        await session.commit()
+        value_dicts = [message.model_dump() for message in messages]
 
-        for message in messages:
-            await session.refresh(message)
+        insert_statement = pg_insert(cls).values(value_dicts)
+
+        upsert_statement = insert_statement.on_conflict_do_update(
+            index_elements=["owner_id", "chat_id", "message_id"],
+            set_={
+                "first_name": insert_statement.excluded.first_name,
+                "username": insert_statement.excluded.username,
+                "message": insert_statement.excluded.message,
+                "timestamp": insert_statement.excluded.timestamp,
+            },
+        )
+
+        await session.execute(upsert_statement)
+        if commit:
+            await session.commit()
 
         return messages
 
@@ -320,12 +339,17 @@ class TelegramMessage(SQLModel, table=True):
 
     @classmethod
     async def get_all_for_owner(
-        cls, owner_id: int, session: AsyncSession
+        cls, owner_id: int, session: AsyncSession, join_entity: bool = False
     ) -> list["TelegramMessage"]:
         """Get all ChatMessage records for a specific owner."""
-        result = await session.execute(
+        query = (
             select(cls).where(cls.owner_id == owner_id).order_by(cls.timestamp.desc())  # type: ignore
-        )
+        )  # type: ignore
+
+        if join_entity:
+            query = query.options(joinedload(cls.telegram_entity))  # type: ignore
+
+        result = await session.execute(query)
         return list(result.scalars().all())
 
     @classmethod
@@ -351,6 +375,23 @@ class TelegramMessage(SQLModel, table=True):
 
         return messages  # type: ignore
 
+    @staticmethod
+    def messages_to_text(messages: list["TelegramMessage"]) -> str:
+        """Convert a list of TelegramMessage objects to a text string."""
+        return_string = ""
+
+        for message in messages:
+            text = message.message
+            if not text or len(text) == 0:
+                continue
+
+            text = text.replace("\n", " ")
+            timestamp = message.timestamp.strftime("%Y-%m-%d %H:%M:%S")
+            author = message.first_name or message.username or "Unknown"
+            return_string += f"{timestamp} - {author}: {text}\n"
+
+        return return_string
+
 
 class TelegramChatSummary(SQLModel, table=True):
     __tablename__ = "telegram_chat_summaries"  # type: ignore
@@ -364,13 +405,9 @@ class TelegramChatSummary(SQLModel, table=True):
 
     owner_id: int = Field(sa_type=BigInteger, primary_key=True)
     chat_id: int = Field(sa_type=BigInteger, primary_key=True)
-    summary_date: datetime = Field(primary_key=True, default_factory=datetime.now)
 
-    name: str = Field(description="Name of the chat")
-    profile_picture: str = Field(description="Base64 profile picture or URL")
-    chat_type: str = Field(description="Chat type: personal, group, or channel")
     topics: list[dict[str, Any]] = Field(
-        sa_type=JSON, description="JSON array of topics with points"
+        sa_type=JSON, description="JSON array of topics with points", nullable=True
     )
 
     is_read: bool = Field(default=False)
@@ -388,11 +425,8 @@ class TelegramChatSummary(SQLModel, table=True):
         owner_id: int,
         chat_id: int,
         pipeline_output: dict[str, Any],
-        profile_picture: str = "",
     ) -> "TelegramChatSummary":
         """Transform pipeline output to ChatSummary for database insertion."""
-        # Map chat types
-        chat_type_map = {"PRIVATE": "personal", "GROUP": "group", "CHANNEL": "channel"}
 
         # Transform topics to API format
         topics: list[dict[str, Any]] = []
@@ -419,9 +453,6 @@ class TelegramChatSummary(SQLModel, table=True):
         return cls(
             owner_id=owner_id,
             chat_id=chat_id,
-            name=pipeline_output["chat_name"],
-            profile_picture=profile_picture,
-            chat_type=chat_type_map.get(pipeline_output["chat_type"], "group"),
             topics=topics,
         )
 
@@ -439,38 +470,31 @@ class TelegramChatSummary(SQLModel, table=True):
         return list(result.scalars().all())
 
     @classmethod
-    async def get_processed_for_owner(
-        cls, owner_id: int, session: AsyncSession, limit: int | None = None
-    ) -> list["TelegramChatSummary"]:
-        """Get processed ChatSummary records for a specific owner."""
-        query = (
-            select(cls)
-            .where(cls.owner_id == owner_id, cls.is_processed == True)
-            .order_by(cls.created_at.asc())  # type: ignore
-        )
+    async def insert_empty(
+        cls, chats: list[TelegramEntity], session: AsyncSession
+    ) -> None:
+        """Insert empty chat summaries for a list of chats."""
+        summaries: list[TelegramChatSummary] = []
+        for chat in chats:
+            summaries.append(await cls.from_telegram_entity(chat))
 
-        if limit:
-            query = query.limit(limit)
+        logger.debug(f"Inserting {len(summaries)} empty chat summaries")
 
-        result = await session.execute(query)
-        return list(result.scalars().all())
+        await cls.insert_many(summaries, session)
 
     @classmethod
-    async def get_unprocessed_for_owner(
-        cls, owner_id: int, session: AsyncSession, limit: int | None = None
-    ) -> list["TelegramChatSummary"]:
-        """Get unprocessed ChatSummary records for a specific owner."""
-        query = (
-            select(cls)
-            .where(cls.owner_id == owner_id, cls.is_processed == False)
-            .order_by(cls.created_at.asc())  # type: ignore
+    async def from_telegram_entity(
+        cls, entity: "TelegramEntity"
+    ) -> "TelegramChatSummary":
+        """Create a ChatSummary from a TelegramEntity."""
+        return cls(
+            owner_id=entity.owner_id,
+            chat_id=entity.chat_id,
+            topics=[],
+            is_read=False,
+            is_processed=False,
+            created_at=datetime.now(),
         )
-
-        if limit:
-            query = query.limit(limit)
-
-        result = await session.execute(query)
-        return list(result.scalars().all())
 
     @classmethod
     async def mark_as_processed(
