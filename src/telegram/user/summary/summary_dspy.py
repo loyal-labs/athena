@@ -7,7 +7,7 @@ import dspy
 import orjson
 
 from src.shared.base_llm import LLMFactory
-from src.telegram.user.summary.summary_schemas import ChatMessage
+from src.telegram.user.summary.summary_schemas import TelegramMessage
 
 
 class TopicSummary(dspy.Signature):
@@ -30,7 +30,7 @@ class TelegramSummaryPipeline(dspy.Module):
         self.extract_topics = dspy.ChainOfThought(TopicSummary)
 
     def forward(
-        self, messages: list[ChatMessage], chat_name: str, chat_type: str
+        self, messages: list[TelegramMessage], chat_name: str, chat_type: str
     ) -> dict[str, Any]:
         """
         Process messages and generate structured summary with minimal LLM calls.
@@ -90,7 +90,7 @@ class TelegramSummaryPipeline(dspy.Module):
         topics: list[dict[str, Any]] = []
         for topic in topics_data:
             # Get messages for this topic
-            topic_messages: list[ChatMessage] = [
+            topic_messages: list[TelegramMessage] = [
                 messages[i]  # type: ignore
                 for i in topic.get("message_indices", [])  # type: ignore
             ]
@@ -144,7 +144,7 @@ class TelegramSummaryPipeline(dspy.Module):
 
 
 async def summarize_chat_messages(
-    messages: list[ChatMessage],
+    messages: list[TelegramMessage],
     chat_name: str,
     chat_type: str,
 ) -> dict[str, Any]:

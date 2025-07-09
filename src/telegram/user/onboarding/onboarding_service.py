@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import time
-from datetime import datetime
 
 import pandas as pd
 from pyrogram.client import Client
@@ -11,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.shared.base import BaseService
 from src.shared.database import DatabaseFactory
 from src.telegram.bot.client.telegram_bot import TelegramBot, TelegramBotFactory
-from src.telegram.user.login.login_schemas import LoginSession
+from src.telegram.user.onboarding.onboarding_schemas import OnboardingSchema
 from src.telegram.user.onboarding.onboarding_texts import (
     WELCOME_MESSAGE_1,
     WELCOME_MESSAGE_2,
@@ -45,15 +44,18 @@ class OnboardingService(BaseService):
             database = await DatabaseFactory.get_instance()
 
             async with database.session() as db_session:
+                logger.debug(f"Getting or creating session for user {owner_id}")
                 user_client_object = await session_manager.get_or_create_session(
                     owner_id, db_session
                 )
                 user_client = user_client_object.get_client()
 
+                logger.debug(f"Sending welcome message to user {owner_id}")
                 # Step 1: Send welcome message
                 welcome_message_task = self._send_welcome_message(bot, owner_id)
 
                 # Step 2: Analyze interests
+                logger.debug(f"Analyzing interests for user {owner_id}")
                 interests_task = self._analyze_interests(
                     user_client, summary_service, db_session
                 )
@@ -61,11 +63,15 @@ class OnboardingService(BaseService):
                 _, interests = await asyncio.gather(
                     welcome_message_task, interests_task
                 )
+                logger.debug(f"Interests analyzed for user {owner_id}")
 
                 # Step 3: Send personalized message based on interests
+                logger.debug(f"Sending personalized message to user {owner_id}")
                 await self._send_interest_message(bot_client, owner_id, interests)
+                logger.debug(f"Personalized message sent to user {owner_id}")
 
                 # Mark user as onboarded
+                logger.debug(f"Marking user {owner_id} as onboarded")
                 return await self._mark_as_onboarded(owner_id, db_session)
 
         except Exception as e:
@@ -150,11 +156,5 @@ class OnboardingService(BaseService):
 
     async def _mark_as_onboarded(self, owner_id: int, db_session: AsyncSession) -> bool:
         """Mark the user as onboarded in the database."""
-        login_sessions = await LoginSession.get_by_owner(owner_id, db_session)
-        for session in login_sessions:
-            session.is_onboarded = True
-            session.updated_at = datetime.now()
-
-        await db_session.commit()
-
+        await OnboardingSchema.mark_as_onboarded(owner_id, db_session)
         return True

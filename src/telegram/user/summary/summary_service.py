@@ -12,7 +12,7 @@ from pyrogram.raw.types.peer_chat import PeerChat
 from pyrogram.raw.types.peer_user import PeerUser
 
 from src.shared.database import Database
-from src.telegram.user.summary.summary_schemas import ChatMessage, TelegramEntity
+from src.telegram.user.summary.summary_schemas import TelegramEntity, TelegramMessage
 
 SUPPORTED_CHAT_TYPES = [
     ChatType.GROUP,
@@ -89,7 +89,7 @@ class SummaryService:
         chat_id: int,
         day_offset: int = 30,
         username: str | None = None,
-    ) -> list[ChatMessage]:
+    ) -> list[TelegramMessage]:
         assert client is not None, "Client is required"
         assert isinstance(client, Client), "Client must be an instance of Client"
         assert day_offset > 0, "Day offset must be greater than 0"
@@ -98,7 +98,7 @@ class SummaryService:
         stop_date = start_date - timedelta(days=day_offset)
         owner_id = client.me.id if client.me else -1
 
-        messages: list[ChatMessage] = []
+        messages: list[TelegramMessage] = []
 
         logger.debug(f"Getting recent messages for chat {chat_id}...")
 
@@ -109,7 +109,9 @@ class SummaryService:
 
             if message.text:
                 messages.append(
-                    ChatMessage.extract_chat_message_info(message, owner_id, chat_id)
+                    TelegramMessage.extract_chat_message_info(
+                        message, owner_id, chat_id
+                    )
                 )
         logger.debug(f"Found {len(messages)} messages")
         return messages
@@ -118,7 +120,7 @@ class SummaryService:
         self,
         client: Client,
         chat_id: int,
-    ) -> list[ChatMessage]:
+    ) -> list[TelegramMessage]:
         assert client is not None, "Client is required"
         assert client.me is not None, "Client must be logged in"
         assert isinstance(client, Client), "Client must be an instance of Client"
@@ -130,10 +132,12 @@ class SummaryService:
         if unread_count is None or unread_count == 0:
             return []
 
-        response_messages: list[ChatMessage] = []
+        response_messages: list[TelegramMessage] = []
 
         async for message in client.get_chat_history(chat_id, limit=unread_count):
-            msg_obj = ChatMessage.extract_chat_message_info(message, owner_id, chat_id)
+            msg_obj = TelegramMessage.extract_chat_message_info(
+                message, owner_id, chat_id
+            )
             response_messages.append(msg_obj)
 
         return response_messages
@@ -152,7 +156,7 @@ class SummaryService:
 
         unread_messages = await self.get_unread_messages_from_chat(client, chat_id)
         async with db.session() as session:
-            await ChatMessage.insert_many(unread_messages, session)
+            await TelegramMessage.insert_many(unread_messages, session)
 
     async def get_recent_dialogs(
         self, client: Client, day_offset: int = 30

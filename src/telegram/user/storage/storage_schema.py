@@ -2,7 +2,15 @@ import logging
 from datetime import datetime
 from typing import Any, Optional
 
-from sqlalchemy import BigInteger, Boolean, ForeignKeyConstraint, LargeBinary, String
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    ForeignKeyConstraint,
+    LargeBinary,
+    PrimaryKeyConstraint,
+    String,
+)
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import Field, SQLModel, col, delete, insert, select, update
 
@@ -62,6 +70,13 @@ class TelegramSessions(SQLModel, table=True):
         return result.scalar_one_or_none() is not None
 
     @classmethod
+    async def get(cls, owner_id: int, session: AsyncSession) -> "TelegramSessions":
+        result = await session.execute(select(cls).where(col(cls.owner_id) == owner_id))
+        fetched_result = result.scalar_one_or_none()
+        assert fetched_result is not None, "Session not found"
+        return fetched_result
+
+    @classmethod
     async def get_attribute(
         cls, owner_id: int, attr: str, session: AsyncSession
     ) -> Any:
@@ -86,13 +101,14 @@ class TelegramPeers(SQLModel, table=True):
             ["telegram_sessions.owner_id"],
             ondelete="CASCADE",
         ),
+        PrimaryKeyConstraint("owner_id", "id", name="telegram_peers_pkey"),
     )
 
-    owner_id: int = Field(sa_type=BigInteger, primary_key=True, unique=True)
-    id: int = Field(sa_type=BigInteger, primary_key=True, index=True, unique=True)
+    owner_id: int = Field(sa_type=BigInteger)
+    id: int = Field(sa_type=BigInteger, index=True)
     access_hash: int = Field(sa_type=BigInteger)
     type: str = Field(sa_type=String, nullable=False)
-    phone_number: str = Field(sa_type=String, index=True)
+    phone_number: str = Field(sa_type=String, index=True, nullable=True)
     last_update_on: int = Field(
         sa_type=BigInteger,
         nullable=False,
@@ -139,23 +155,33 @@ class TelegramPeers(SQLModel, table=True):
 
     @classmethod
     async def update_many(
-        cls, owner_id: int, values: list["TelegramPeers"], session: AsyncSession
+        cls, values: list["TelegramPeers"], session: AsyncSession
     ) -> None:
         assert values is not None, "Values is None"
 
-        keys_to_delete = [peer.id for peer in values]
+        if len(values) == 0:
+            return
 
-        # bulk delete
-        delete_statement = delete(cls).where(
-            col(cls.owner_id) == owner_id, col(cls.id).in_(keys_to_delete)
-        )
-        await session.execute(delete_statement)
+        logger.debug(f"Updating {len(values)} peers")
 
-        # bulk insert
+        # Prepare the data
         value_dicts = [value.model_dump() for value in values]
-        insert_statement = insert(cls).values(value_dicts)
-        await session.execute(insert_statement)
 
+        # Create insert statement with ON CONFLICT
+        insert_statement = pg_insert(cls).values(value_dicts)
+
+        # Option 1: Update all fields on conflict
+        upsert_statement = insert_statement.on_conflict_do_update(
+            index_elements=["owner_id", "id"],  # The composite key columns
+            set_={
+                "access_hash": insert_statement.excluded.access_hash,
+                "type": insert_statement.excluded.type,
+                "phone_number": insert_statement.excluded.phone_number,
+                "last_update_on": insert_statement.excluded.last_update_on,
+            },
+        )
+
+        await session.execute(upsert_statement)
         await session.commit()
 
 
@@ -168,14 +194,15 @@ class TelegramUsernames(SQLModel, table=True):
             ondelete="CASCADE",
         ),
         ForeignKeyConstraint(
-            ["id"],
-            ["telegram_peers.id"],
+            ["owner_id", "id"],
+            ["telegram_peers.owner_id", "telegram_peers.id"],
             ondelete="CASCADE",
         ),
+        PrimaryKeyConstraint("owner_id", "id", name="telegram_usernames_pkey"),
     )
 
-    owner_id: int = Field(sa_type=BigInteger, primary_key=True)
-    id: int = Field(sa_type=BigInteger, primary_key=True, index=True)
+    owner_id: int = Field(sa_type=BigInteger)
+    id: int = Field(sa_type=BigInteger, index=True)
     username: str = Field(sa_type=String, index=True)
 
     @classmethod
@@ -189,23 +216,41 @@ class TelegramUsernames(SQLModel, table=True):
 
     @classmethod
     async def update_many(
-        cls, owner_id: int, values: list["TelegramUsernames"], session: AsyncSession
+        cls, values: list["TelegramUsernames"], session: AsyncSession
     ) -> None:
         assert values is not None, "Values is None"
+        if len(values) == 0:
+            return
 
-        keys_to_delete = [username.id for username in values]
+        logger.debug(f"Updating {len(values)} usernames")
 
-        # bulk delete
-        delete_statement = delete(cls).where(
-            col(cls.owner_id) == owner_id, col(cls.id).in_(keys_to_delete)
-        )
-        await session.execute(delete_statement)
-
-        # bulk insert
+        # Prepare the data
         value_dicts = [value.model_dump() for value in values]
-        insert_statement = insert(cls).values(value_dicts)
-        await session.execute(insert_statement)
+        seen: set[tuple[int, int]] = set()
+        unique_usernames: list[dict[str, Any]] = []
 
+        for value in value_dicts:
+            if value["owner_id"] is None or value["id"] is None:
+                logger.debug(f"Invalid owner_id or id: {value}")
+                continue
+
+            key = (value["owner_id"], value["id"])
+            if key not in seen:
+                seen.add(key)
+                unique_usernames.append(value)
+
+        # Create insert statement with ON CONFLICT
+        insert_statement = pg_insert(cls).values(unique_usernames)
+
+        # Option 1: Update all fields on conflict
+        upsert_statement = insert_statement.on_conflict_do_update(
+            index_elements=["owner_id", "id"],  # The composite key columns
+            set_={
+                "username": insert_statement.excluded.username,
+            },
+        )
+
+        await session.execute(upsert_statement)
         await session.commit()
 
 
@@ -232,22 +277,31 @@ class TelegramUpdateState(SQLModel, table=True):
 
     @classmethod
     async def update_many(
-        cls, owner_id: int, values: list["TelegramUpdateState"], session: AsyncSession
+        cls, values: list["TelegramUpdateState"], session: AsyncSession
     ) -> None:
         assert values is not None, "Values is None"
 
-        keys_to_delete = [update.id for update in values]
+        if len(values) == 0:
+            return
 
-        # bulk delete
-        delete_statement = delete(cls).where(
-            col(cls.owner_id) == owner_id, col(cls.id).in_(keys_to_delete)
-        )
-        await session.execute(delete_statement)
+        logger.debug(f"Updating {len(values)} update states")
 
-        # bulk insert
+        # Prepare the data
         value_dicts = [value.model_dump() for value in values]
-        insert_statement = insert(cls).values(value_dicts)
-        await session.execute(insert_statement)
+
+        # Create insert statement with ON CONFLICT
+        insert_statement = pg_insert(cls).values(value_dicts)
+
+        upsert_statement = insert_statement.on_conflict_do_update(
+            index_elements=["owner_id", "id"],  # The composite key columns
+            set_={
+                "pts": insert_statement.excluded.pts,
+                "qts": insert_statement.excluded.qts,
+                "date": insert_statement.excluded.date,
+                "seq": insert_statement.excluded.seq,
+            },
+        )
+        await session.execute(upsert_statement)
 
         await session.commit()
 

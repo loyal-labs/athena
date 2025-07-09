@@ -1,15 +1,12 @@
 from datetime import datetime
 from logging import getLogger
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from pyrogram.enums import ChatType
 from pyrogram.types import Chat, Dialog, Message
 from sqlalchemy import JSON, BigInteger, ForeignKeyConstraint
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import Field, Relationship, SQLModel, select
-
-if TYPE_CHECKING:
-    from src.telegram.user.login.login_schemas import LoginSession
 
 logger = getLogger("telegram.user.summary.summary_schemas")
 
@@ -19,7 +16,7 @@ class TelegramEntity(SQLModel, table=True):
     __table_args__ = (
         ForeignKeyConstraint(
             ["owner_id"],
-            ["login_sessions.owner_id"],
+            ["telegram_sessions.owner_id"],
             ondelete="CASCADE",
         ),
     )
@@ -40,17 +37,12 @@ class TelegramEntity(SQLModel, table=True):
 
     rating: float = 0.0
 
-    # Relationship to LoginSession
-    login_session: "LoginSession" = Relationship(
-        back_populates="telegram_entities", sa_relationship_kwargs={"lazy": "select"}
-    )
-
     # Relationships to child tables
-    chat_messages: list["ChatMessage"] = Relationship(
+    chat_messages: list["TelegramMessage"] = Relationship(
         back_populates="telegram_entity",
         sa_relationship_kwargs={"lazy": "select", "cascade": "all, delete-orphan"},
     )
-    chat_summaries: list["ChatSummary"] = Relationship(
+    chat_summaries: list["TelegramChatSummary"] = Relationship(
         back_populates="telegram_entity",
         sa_relationship_kwargs={"lazy": "select", "cascade": "all, delete-orphan"},
     )
@@ -191,6 +183,18 @@ class TelegramEntity(SQLModel, table=True):
         return list(result.scalars().all())
 
     @classmethod
+    async def get_unread(
+        cls, owner_id: int, session: AsyncSession
+    ) -> list["TelegramEntity"]:
+        """Get all unread TelegramEntity records for a specific owner."""
+        result = await session.execute(
+            select(cls)
+            .where(cls.owner_id == owner_id, cls.unread_count > 0)
+            .order_by(cls.rating.desc(), cls.last_message_date.desc())  # type: ignore
+        )
+        return list(result.scalars().all())
+
+    @classmethod
     async def get_filtered(
         cls,
         owner_id: int,
@@ -221,8 +225,8 @@ class TelegramEntity(SQLModel, table=True):
         return list(result.scalars().all())
 
 
-class ChatMessage(SQLModel, table=True):
-    __tablename__ = "chat_messages"  # type: ignore
+class TelegramMessage(SQLModel, table=True):
+    __tablename__ = "telegram_messages"  # type: ignore
     __table_args__ = (
         ForeignKeyConstraint(
             ["owner_id", "chat_id"],
@@ -249,7 +253,7 @@ class ChatMessage(SQLModel, table=True):
     @classmethod
     def extract_chat_message_info(
         cls, message_object: Message, owner_id: int, chat_id: int
-    ) -> "ChatMessage":
+    ) -> "TelegramMessage":
         try:
             message_id = message_object.id
             # We don't handle non-text messages yet
@@ -277,7 +281,7 @@ class ChatMessage(SQLModel, table=True):
             logger.error(f"Error extracting chat message info: {e}")
             raise e
 
-    async def insert(self, session: AsyncSession) -> "ChatMessage":
+    async def insert(self, session: AsyncSession) -> "TelegramMessage":
         """Insert a single ChatMessage into the database."""
         session.add(self)
         await session.commit()
@@ -286,8 +290,8 @@ class ChatMessage(SQLModel, table=True):
 
     @classmethod
     async def insert_many(
-        cls, messages: list["ChatMessage"], session: AsyncSession
-    ) -> list["ChatMessage"]:
+        cls, messages: list["TelegramMessage"], session: AsyncSession
+    ) -> list["TelegramMessage"]:
         """Insert multiple ChatMessage objects into the database."""
         if not messages:
             return []
@@ -303,7 +307,7 @@ class ChatMessage(SQLModel, table=True):
     @classmethod
     async def get(
         cls, owner_id: int, chat_id: int, message_id: int, session: AsyncSession
-    ) -> "ChatMessage | None":
+    ) -> "TelegramMessage | None":
         """Get a single ChatMessage by composite primary key."""
         result = await session.execute(
             select(cls).where(
@@ -317,7 +321,7 @@ class ChatMessage(SQLModel, table=True):
     @classmethod
     async def get_all_for_owner(
         cls, owner_id: int, session: AsyncSession
-    ) -> list["ChatMessage"]:
+    ) -> list["TelegramMessage"]:
         """Get all ChatMessage records for a specific owner."""
         result = await session.execute(
             select(cls).where(cls.owner_id == owner_id).order_by(cls.timestamp.desc())  # type: ignore
@@ -331,7 +335,7 @@ class ChatMessage(SQLModel, table=True):
         chat_id: int,
         session: AsyncSession,
         limit: int | None = None,
-    ) -> list["ChatMessage"]:
+    ) -> list["TelegramMessage"]:
         """Get all messages for a specific chat, optionally filtered."""
         query = (
             select(cls)
@@ -348,8 +352,8 @@ class ChatMessage(SQLModel, table=True):
         return messages  # type: ignore
 
 
-class ChatSummary(SQLModel, table=True):
-    __tablename__ = "chat_summaries"  # type: ignore
+class TelegramChatSummary(SQLModel, table=True):
+    __tablename__ = "telegram_chat_summaries"  # type: ignore
     __table_args__ = (
         ForeignKeyConstraint(
             ["owner_id", "chat_id"],
@@ -385,7 +389,7 @@ class ChatSummary(SQLModel, table=True):
         chat_id: int,
         pipeline_output: dict[str, Any],
         profile_picture: str = "",
-    ) -> "ChatSummary":
+    ) -> "TelegramChatSummary":
         """Transform pipeline output to ChatSummary for database insertion."""
         # Map chat types
         chat_type_map = {"PRIVATE": "personal", "GROUP": "group", "CHANNEL": "channel"}
@@ -424,7 +428,7 @@ class ChatSummary(SQLModel, table=True):
     @classmethod
     async def get_all_for_owner(
         cls, owner_id: int, session: AsyncSession
-    ) -> list["ChatSummary"]:
+    ) -> list["TelegramChatSummary"]:
         """Get all ChatSummary records for a specific owner."""
         result = await session.execute(
             select(cls)
@@ -437,7 +441,7 @@ class ChatSummary(SQLModel, table=True):
     @classmethod
     async def get_processed_for_owner(
         cls, owner_id: int, session: AsyncSession, limit: int | None = None
-    ) -> list["ChatSummary"]:
+    ) -> list["TelegramChatSummary"]:
         """Get processed ChatSummary records for a specific owner."""
         query = (
             select(cls)
@@ -454,7 +458,7 @@ class ChatSummary(SQLModel, table=True):
     @classmethod
     async def get_unprocessed_for_owner(
         cls, owner_id: int, session: AsyncSession, limit: int | None = None
-    ) -> list["ChatSummary"]:
+    ) -> list["TelegramChatSummary"]:
         """Get unprocessed ChatSummary records for a specific owner."""
         query = (
             select(cls)
@@ -481,7 +485,7 @@ class ChatSummary(SQLModel, table=True):
             summary.is_processed = True
             await session.commit()
 
-    async def insert(self, session: AsyncSession) -> "ChatSummary":
+    async def insert(self, session: AsyncSession) -> "TelegramChatSummary":
         """Insert a single ChatSummary into the database."""
         session.add(self)
         await session.commit()
@@ -490,8 +494,8 @@ class ChatSummary(SQLModel, table=True):
 
     @classmethod
     async def insert_many(
-        cls, summaries: list["ChatSummary"], session: AsyncSession
-    ) -> list["ChatSummary"]:
+        cls, summaries: list["TelegramChatSummary"], session: AsyncSession
+    ) -> list["TelegramChatSummary"]:
         """Insert multiple ChatSummary objects into the database."""
         if not summaries:
             return []

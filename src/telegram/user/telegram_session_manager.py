@@ -5,13 +5,13 @@ from datetime import datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.telegram.user.login.login_schemas import LoginSession
+from src.telegram.user.onboarding.onboarding_schemas import OnboardingSchema
+from src.telegram.user.storage.storage_schema import TelegramSessions
 from src.telegram.user.telegram_user_client import TelegramUser
 
 logger = logging.getLogger("athena.telegram.user.session_manager")
 
 
-# TODO: Move to redis setup later on.
 class UserSessionManager:
     """
     Manages multiple Telegram user sessions with LRU eviction and database persistence.
@@ -105,24 +105,12 @@ class UserSessionManager:
                 self._sessions.move_to_end(owner_id)  # LRU update
                 return self._sessions[owner_id]
 
-            # Get session from database
-            login_sessions = await LoginSession.get_by_owner(owner_id, db_session)
-            assert login_sessions is not None, (
-                f"No login sessions found for owner_id: {owner_id}"
-            )
+            user_session_db = await TelegramSessions.get(owner_id, db_session)
 
-            # Use the most recent session
-            login_session = sorted(
-                login_sessions, key=lambda x: x.updated_at, reverse=True
-            )[0]
-
-            # Evict old sessions if at capacity
-            if len(self._sessions) >= self._max_sessions:
-                await self._evict_lru_session()
-
-            # Create new TelegramUser from session string
-            user_session = await self._create_session_from_string(
-                login_session.session_string
+            user_session = await TelegramUser.create(
+                user_session_db.dc_id,
+                user_session_db.auth_key,
+                owner_id,
             )
 
             # Start the session
@@ -156,21 +144,15 @@ class UserSessionManager:
         Returns:
             TelegramUser instance
         """
-        # Create TelegramUser instance
+
+        # Create new session
         user_session = await TelegramUser.create(dc_id, auth_key, owner_id)
 
-        # Save to database
-        assert user_session.session_string is not None, "Session string is None"
-        login_session, created = await LoginSession.get_or_create(
+        # Save onboarding status
+        await OnboardingSchema.create(
             owner_id=owner_id,
-            session_string=user_session.session_string,
             session=db_session,
         )
-
-        if not created:
-            # Update the existing session
-            login_session.updated_at = datetime.now()
-            await db_session.commit()
 
         # Use per-user lock
         if owner_id not in self._locks:
@@ -188,11 +170,6 @@ class UserSessionManager:
 
         logger.info(f"Created brand new session for owner {owner_id}")
         return user_session
-
-    async def _create_session_from_string(self, session_string: str) -> TelegramUser:
-        """Create a TelegramUser instance from a session string."""
-
-        return await TelegramUser.create_from_session_string(session_string)
 
     async def _evict_lru_session(self):
         """Remove the least recently used session."""

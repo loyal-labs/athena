@@ -18,7 +18,9 @@ from src.shared.dependencies import (
     get_database,
     verify_telegram_auth,
 )
-from src.telegram.user.summary.summary_schemas import ChatSummary as TelegramChatSummary
+from src.telegram.user.summary.summary_schemas import (
+    TelegramChatSummary as TelegramChatSummary,
+)
 from src.telegram.user.summary.summary_schemas import TelegramEntity
 from src.telegram.user.summary.summary_service import SummaryService
 from src.telegram.user.telegram_session_manager import UserSessionFactory

@@ -10,7 +10,7 @@ from pyrogram.types import Message
 
 from src.shared.database import DatabaseFactory
 from src.telegram.bot.messages.messages_service import MessagesService
-from src.telegram.user.login.login_schemas import LoginSession
+from src.telegram.user.onboarding.onboarding_schemas import OnboardingSchema
 from src.telegram.user.onboarding.onboarding_service import OnboardingService
 from src.telegram.user.telegram_session_manager import UserSessionFactory
 
@@ -54,10 +54,11 @@ class MessageHandlers:
             )
 
             # Check if first-time user and run onboarding
-            login_sessions = await LoginSession.get_by_owner(
+            onboarding_status = await OnboardingSchema.get(
                 message.from_user.id, db_session
             )
-            if login_sessions and not login_sessions[0].is_onboarded:
+
+            if onboarding_status and not onboarding_status.is_onboarded:
                 onboarding = OnboardingService()
                 await onboarding.run_onboarding_pipeline(message.from_user.id)
 

@@ -7,7 +7,7 @@ from pyrogram.handlers.message_handler import MessageHandler
 from pyrogram.types import Message
 
 from src.shared.database import AsyncSession, Database, DatabaseFactory
-from src.telegram.user.summary.summary_schemas import ChatMessage, TelegramEntity
+from src.telegram.user.summary.summary_schemas import TelegramEntity, TelegramMessage
 
 logger = logging.getLogger("athena.telegram.user.summary.handlers")
 
@@ -37,9 +37,9 @@ class SummaryHandlers:
 
     async def __conditional_message_insert(
         self, message: Message, entity: TelegramEntity, session: AsyncSession
-    ) -> ChatMessage:
+    ) -> TelegramMessage:
         # TODO: Check the number of unread messages and the type of the chat to decide if we need to save the message
-        chat_message = ChatMessage.extract_chat_message_info(
+        chat_message = TelegramMessage.extract_chat_message_info(
             message, entity.owner_id, entity.chat_id
         )
         await chat_message.insert(session)

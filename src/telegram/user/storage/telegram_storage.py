@@ -137,7 +137,7 @@ class PostgresStorage(Storage):
         ]
 
         async with self.database_instance.session() as session:
-            await TelegramPeers.update_many(self.telegram_id, peers_list, session)
+            await TelegramPeers.update_many(peers_list, session)
 
     async def update_usernames(self, usernames: list[tuple[int, list[str]]]) -> None:
         assert self.database_instance is not None, "Database instance is not set"
@@ -153,9 +153,7 @@ class PostgresStorage(Storage):
         ]
 
         async with self.database_instance.session() as session:
-            await TelegramUsernames.update_many(
-                self.telegram_id, usernames_to_add, session
-            )
+            await TelegramUsernames.update_many(usernames_to_add, session)
 
     async def update_state(  # type: ignore
         self, value: object | int | TelegramUpdateState = object
