@@ -70,14 +70,7 @@ class OnboardingService(BaseService):
                 logger.debug(f"Interests analyzed for user {owner_id}")
 
                 logger.debug(f"Sending personalized message to user {owner_id}")
-                jobs = [
-                    # Step 3: Send personalized message based on interests
-                    self._send_interest_message(bot_client, owner_id, interests),
-                    # Step 4: Download the first unread chats
-                    self.__insert_empty_chat_summaries(owner_id, db_session),
-                ]
-
-                await asyncio.gather(*jobs)
+                await self._send_interest_message(bot_client, owner_id, interests)
 
                 # Mark user as onboarded
                 logger.debug(f"Marking user {owner_id} as onboarded")
@@ -89,6 +82,7 @@ class OnboardingService(BaseService):
                     user_client, owner_id, summary_service, session
                 )
                 logger.debug(f"Downloaded unread chats for user {owner_id}")
+                await self.__insert_empty_chat_summaries(owner_id, db_session)
 
             return True
 
@@ -106,7 +100,11 @@ class OnboardingService(BaseService):
         """Download the first unread chats for a user."""
         chats = await TelegramEntity.get_unread(owner_id, db_session)
 
-        for i in range(0, len(chats), 2):
+        total_chats = len(chats)
+        total_steps = total_chats // 2
+
+        for i in range(0, total_steps):
+            logger.debug(f"Downloading messages for step {i + 1}/{total_steps}")
             messages: list[TelegramMessage] = []
             chat_chunk = chats[i : i + 2]
             tasks = [
@@ -130,8 +128,10 @@ class OnboardingService(BaseService):
         self, owner_id: int, db_session: AsyncSession
     ) -> None:
         """Insert empty chat summaries for all unread chats."""
-        chats = await TelegramEntity.get_unread(owner_id, db_session)
-        await TelegramChatSummary.insert_empty(chats, db_session)
+        unique_chat_ids = await TelegramMessage.get_unique_chat_ids(
+            owner_id, db_session
+        )
+        await TelegramChatSummary.insert_empty(owner_id, unique_chat_ids, db_session)
 
     async def _send_welcome_message(self, bot: TelegramBot, owner_id: int) -> None:
         """Send initial welcome message."""

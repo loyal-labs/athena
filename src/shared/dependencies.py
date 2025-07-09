@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 
 from src.shared.database import Database, DatabaseFactory
 from src.telegram.bot.client.telegram_bot import TelegramBot, TelegramBotFactory
+from src.telegram.user.summary.summary_service import SummaryService
 
 #
 # -- Schemas --
@@ -63,6 +64,10 @@ async def get_database() -> Database:
 
 async def get_telegram_bot() -> TelegramBot:
     return await TelegramBotFactory.get_instance()
+
+
+async def get_summary_service() -> SummaryService:
+    return SummaryService()
 
 
 async def verify_telegram_auth(

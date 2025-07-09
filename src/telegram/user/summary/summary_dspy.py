@@ -59,18 +59,25 @@ class TelegramSummaryPipeline(dspy.Module):
             text = TelegramMessage.messages_to_text(messages)
             result = self.extract_topics(messages=text)  # type: ignore
             assert isinstance(result, Prediction), "Result is not a Prediction"
-            topics_data = orjson.loads(result.topics)  # type: ignore
         except Exception as e:
             logging.error(f"Error extracting topics: {e}")
+            raise e from e
+
+        try:
+            assert isinstance(result.topics, str), "Result topics are not a string"  # type: ignore
+            topics_data = orjson.loads(result.topics)  # type: ignore
+        except orjson.JSONDecodeError:
+            topics_data = result.topics.replace("```json", "").replace("```", "")  # type: ignore
+            topics_data = orjson.loads(topics_data)  # type: ignore
+        except Exception as e:
+            logging.error(f"Error parsing topics: {e}")
             raise e from e
 
         # Format output
         topics: list[dict[str, Any]] = []
         for topic in topics_data:
             # Extract participants for this topic
-            participants = list(
-                {m.first_name or m.username or "Unknown" for m in messages}
-            )
+            participants = list({m.title or m.username or "Unknown" for m in messages})
 
             topics.append(
                 {

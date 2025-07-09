@@ -85,7 +85,10 @@ class ChatSummaryResponse(BaseModel):
     Chat summary response is a list of chats.
     """
 
-    total_chats: int = Field(..., description="Total chats with unread messages")
+    step: int = Field(2, description="Step of the summary")
+    total_pages: int = Field(..., description="Total pages of the summary")
+    page: int = Field(0, description="Page of the summary")
+
     chats: list[ChatSummary] = Field(..., description="Chats")
 
 

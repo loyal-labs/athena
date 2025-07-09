@@ -4,7 +4,10 @@ from pyrogram import filters
 from pyrogram.client import Client
 from pyrogram.handlers.handler import Handler
 from pyrogram.handlers.message_handler import MessageHandler
-from pyrogram.types import Message
+from pyrogram.handlers.raw_update_handler import RawUpdateHandler
+from pyrogram.raw.base.update import Update
+from pyrogram.raw.types.update_read_history_inbox import UpdateReadHistoryInbox
+from pyrogram.types import Chat, Message, User
 
 from src.shared.database import AsyncSession, Database, DatabaseFactory
 from src.telegram.user.summary.summary_schemas import TelegramEntity, TelegramMessage
@@ -12,7 +15,18 @@ from src.telegram.user.summary.summary_schemas import TelegramEntity, TelegramMe
 logger = logging.getLogger("athena.telegram.user.summary.handlers")
 
 
-class SummaryHandlers:
+class TelegramUserMessageHandlers:
+    @staticmethod
+    async def raw_update_handler(
+        client: Client, raw_update: Update, users: list[User], chats: list[Chat]
+    ):
+        if isinstance(raw_update, UpdateReadHistoryInbox):
+            await TelegramUserMessageHandlers.process_inbox_update(raw_update)
+
+    @staticmethod
+    async def process_inbox_update(update: UpdateReadHistoryInbox):
+        pass
+
     async def __get_telegram_entity(
         self, client: Client, message: Message, session: AsyncSession
     ) -> TelegramEntity:

@@ -8,7 +8,7 @@ from sqlalchemy import JSON, BigInteger, ForeignKeyConstraint, PrimaryKeyConstra
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
-from sqlmodel import Field, Relationship, SQLModel, select
+from sqlmodel import Field, Relationship, SQLModel, col, func, select, update
 
 logger = getLogger("telegram.user.summary.summary_schemas")
 
@@ -244,10 +244,11 @@ class TelegramMessage(SQLModel, table=True):
     chat_id: int = Field(sa_type=BigInteger)
     message_id: int = Field(sa_type=BigInteger, description="ID of the message")
 
-    first_name: str | None = Field(None, description="First name of the sender")
+    title: str | None = Field(None, description="Title of the sender")
     username: str | None = Field(None, description="Username of the sender")
     message: str = Field(description="Message content")
     timestamp: datetime = Field(description="Timestamp of the message")
+    is_read: bool = Field(default=False, description="Whether the message is read")
 
     # Relationship to TelegramEntity
     telegram_entity: "TelegramEntity" = Relationship(
@@ -256,30 +257,39 @@ class TelegramMessage(SQLModel, table=True):
 
     @classmethod
     def extract_chat_message_info(
-        cls, message_object: Message, owner_id: int, chat_id: int
+        cls, message_object: Message, owner_id: int, chat_id: int, is_read: bool = False
     ) -> "TelegramMessage":
         try:
             message_id = message_object.id
             # We don't handle non-text messages yet
-            message = message_object.text
-            first_name = (
-                message_object.from_user.first_name
-                if message_object.from_user
-                else None
-            )
-            username = (
-                message_object.from_user.username if message_object.from_user else None
-            )
+            message = message_object.text or message_object.caption or ""
+            if message_object.from_user:
+                title = message_object.from_user.first_name
+            elif message_object.channel_post:
+                assert message_object.chat is not None, "Chat is required"
+                title = message_object.chat.title or None
+            else:
+                title = None
+
+            if message_object.from_user:
+                username = message_object.from_user.username
+            elif message_object.channel_post:
+                assert message_object.chat is not None, "Chat is required"
+                username = message_object.chat.username or None
+            else:
+                username = None
+
             timestamp = message_object.date
 
             return cls(
                 owner_id=owner_id,
                 chat_id=chat_id,
                 message_id=message_id,
-                first_name=first_name,
+                title=title,
                 username=username,
                 message=message or "",
                 timestamp=timestamp or datetime.now(),
+                is_read=is_read,
             )
         except Exception as e:
             logger.error(f"Error extracting chat message info: {e}")
@@ -310,7 +320,7 @@ class TelegramMessage(SQLModel, table=True):
         upsert_statement = insert_statement.on_conflict_do_update(
             index_elements=["owner_id", "chat_id", "message_id"],
             set_={
-                "first_name": insert_statement.excluded.first_name,
+                "title": insert_statement.excluded.title,
                 "username": insert_statement.excluded.username,
                 "message": insert_statement.excluded.message,
                 "timestamp": insert_statement.excluded.timestamp,
@@ -336,6 +346,15 @@ class TelegramMessage(SQLModel, table=True):
             )
         )
         return result.scalar_one_or_none()
+
+    @classmethod
+    async def get_unique_chat_ids(
+        cls, owner_id: int, session: AsyncSession
+    ) -> list[int]:
+        """Get all unique chat IDs for a specific owner."""
+        query = select(func.distinct(cls.chat_id)).where(cls.owner_id == owner_id)
+        result = await session.execute(query)
+        return list(result.scalars().all())
 
     @classmethod
     async def get_all_for_owner(
@@ -372,6 +391,7 @@ class TelegramMessage(SQLModel, table=True):
 
         result = await session.execute(query)
         messages = list(result.scalars().all())
+        print(messages)
 
         return messages  # type: ignore
 
@@ -381,13 +401,14 @@ class TelegramMessage(SQLModel, table=True):
         return_string = ""
 
         for message in messages:
+            print(message)
             text = message.message
             if not text or len(text) == 0:
                 continue
 
             text = text.replace("\n", " ")
             timestamp = message.timestamp.strftime("%Y-%m-%d %H:%M:%S")
-            author = message.first_name or message.username or "Unknown"
+            author = message.title or message.username or "Unknown"
             return_string += f"{timestamp} - {author}: {text}\n"
 
         return return_string
@@ -406,7 +427,7 @@ class TelegramChatSummary(SQLModel, table=True):
     owner_id: int = Field(sa_type=BigInteger, primary_key=True)
     chat_id: int = Field(sa_type=BigInteger, primary_key=True)
 
-    topics: list[dict[str, Any]] = Field(
+    topics: list[dict[str, Any]] | None = Field(
         sa_type=JSON, description="JSON array of topics with points", nullable=True
     )
 
@@ -458,25 +479,99 @@ class TelegramChatSummary(SQLModel, table=True):
 
     @classmethod
     async def get_all_for_owner(
-        cls, owner_id: int, session: AsyncSession
+        cls, owner_id: int, session: AsyncSession, join_entity: bool = False
     ) -> list["TelegramChatSummary"]:
         """Get all ChatSummary records for a specific owner."""
-        result = await session.execute(
-            select(cls)
-            .where(cls.owner_id == owner_id)
-            .order_by(cls.summary_date.desc())  # type: ignore
+        query = (
+            select(cls).where(cls.owner_id == owner_id).order_by(cls.chat_id.desc())  # type: ignore
         )
+
+        if join_entity:
+            query = query.options(joinedload(cls.telegram_entity))  # type: ignore
+
+        result = await session.execute(query)
 
         return list(result.scalars().all())
 
     @classmethod
+    async def get_chat_with_offset(
+        cls, owner_id: int, session: AsyncSession, offset: int
+    ) -> list["TelegramChatSummary"]:
+        """Get a ChatSummary record for a specific owner with an offset."""
+        query = (
+            select(cls)
+            .where(cls.owner_id == owner_id)
+            .order_by(cls.chat_id.desc())  # type: ignore
+            .offset(offset)
+            .limit(1)
+            .options(joinedload(cls.telegram_entity))  # type: ignore
+        )
+
+        result = await session.execute(query)
+        return list(result.scalars().all())
+
+    @classmethod
+    async def choose_unread_non_processed_summary(
+        cls, owner_id: int, session: AsyncSession, limit: int = 1
+    ) -> list["TelegramChatSummary"]:
+        """Choose an unread non-processed summary for a specific owner."""
+        stmt = (
+            select(cls)
+            .where(
+                cls.owner_id == owner_id,
+                cls.is_processed == False,  # noqa: E712
+                cls.is_read == False,  # noqa: E712
+            )
+            .order_by(cls.created_at.desc())  # type: ignore
+            .limit(limit)
+        )
+        result = await session.execute(stmt)
+        return list(result.scalars().all())
+
+    @classmethod
+    async def count_processed_unread_summary(
+        cls, owner_id: int, session: AsyncSession
+    ) -> int:
+        """Count the number of processed summaries for a specific owner."""
+        stmt = (
+            select(func.count())
+            .select_from(cls)
+            .where(
+                cls.owner_id == owner_id,
+                cls.is_processed == True,  # noqa: E712
+                cls.is_read == False,  # noqa: E712
+            )
+        )
+
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none() or 0
+
+    @classmethod
+    async def count_unread_summaries(cls, owner_id: int, session: AsyncSession) -> int:
+        """Count the number of unread summaries for a specific owner."""
+        stmt = (
+            select(func.count())
+            .select_from(cls)
+            .where(cls.owner_id == owner_id, not cls.is_read == False)  # noqa: E712
+        )
+
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none() or 0
+
+    @classmethod
     async def insert_empty(
-        cls, chats: list[TelegramEntity], session: AsyncSession
+        cls, owner_id: int, chats_ids: list[int], session: AsyncSession
     ) -> None:
         """Insert empty chat summaries for a list of chats."""
         summaries: list[TelegramChatSummary] = []
-        for chat in chats:
-            summaries.append(await cls.from_telegram_entity(chat))
+        for chat_id in chats_ids:
+            summaries.append(
+                cls(
+                    owner_id=owner_id,
+                    chat_id=chat_id,
+                    topics=[],
+                )
+            )
 
         logger.debug(f"Inserting {len(summaries)} empty chat summaries")
 
@@ -508,6 +603,22 @@ class TelegramChatSummary(SQLModel, table=True):
         if summary:
             summary.is_processed = True
             await session.commit()
+
+    @classmethod
+    async def update_topics(
+        cls, value: "TelegramChatSummary", session: AsyncSession
+    ) -> None:
+        """Update the topics for a ChatSummary."""
+        stmt = (
+            update(cls)
+            .where(
+                col(cls.owner_id) == value.owner_id,
+                col(cls.chat_id) == value.chat_id,
+            )
+            .values(topics=value.topics)
+        )
+        await session.execute(stmt)
+        await session.commit()
 
     async def insert(self, session: AsyncSession) -> "TelegramChatSummary":
         """Insert a single ChatSummary into the database."""

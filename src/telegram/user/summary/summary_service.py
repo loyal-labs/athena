@@ -10,9 +10,15 @@ from pyrogram.raw.types.contacts.top_peers import TopPeers
 from pyrogram.raw.types.peer_channel import PeerChannel
 from pyrogram.raw.types.peer_chat import PeerChat
 from pyrogram.raw.types.peer_user import PeerUser
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.shared.database import Database
-from src.telegram.user.summary.summary_schemas import TelegramEntity, TelegramMessage
+from src.telegram.user.summary.summary_dspy import summarize_chat_messages
+from src.telegram.user.summary.summary_schemas import (
+    TelegramChatSummary,
+    TelegramEntity,
+    TelegramMessage,
+)
 
 SUPPORTED_CHAT_TYPES = [
     ChatType.GROUP,
@@ -116,6 +122,51 @@ class SummaryService:
         logger.debug(f"Found {len(messages)} messages")
         return messages
 
+    async def check_for_unread_summaries(
+        self, owner_id: int, session: AsyncSession
+    ) -> bool:
+        """
+        Checks if there are any unread summaries or we need to create new ones.
+        """
+        assert session is not None, "Session is required"
+        assert isinstance(session, AsyncSession), (
+            "Session must be an instance of AsyncSession"
+        )
+
+        count = await TelegramChatSummary.count_processed_unread_summary(
+            owner_id, session
+        )
+        return count > 0
+
+    async def create_chat_summary(
+        self,
+        owner_id: int,
+        chat_id: int,
+        session: AsyncSession,
+        chat_name: str,
+        chat_type: str,
+        unread_count: int | None = None,
+    ) -> TelegramChatSummary:
+        assert chat_id is not None, "Chat ID is required"
+        assert session is not None, "Session is required"
+        assert isinstance(session, AsyncSession), (
+            "Session must be an instance of AsyncSession"
+        )
+        if chat_type == "CHANNEL":
+            limit = unread_count
+        else:
+            limit = None
+
+        messages = await TelegramMessage.get_messages_for_chat(
+            owner_id, chat_id, session, limit
+        )
+        summary = await summarize_chat_messages(messages, chat_name, chat_type)
+        summary_obj = TelegramChatSummary.from_pipeline_output(
+            owner_id, chat_id, summary
+        )
+        # await TelegramChatSummary.update_topics(summary_obj, session)
+        return summary_obj
+
     async def get_unread_messages_from_chat(
         self,
         client: Client,
@@ -181,7 +232,6 @@ class SummaryService:
         assert client is not None, "Client is required"
         assert isinstance(client, Client), "Client must be an instance of Client"
         assert day_offset > 0, "Day offset must be greater than 0"
-        await client.resolve_peer("me")
 
         start_date = datetime.now()
         stop_date = start_date - timedelta(days=day_offset)
@@ -190,8 +240,9 @@ class SummaryService:
 
         response_array: list[TelegramEntity] = []
 
-        async for dialog in client.get_dialogs():
-            if dialog.chat.type not in SUPPORTED_CHAT_TYPES:
+        async for dialog in client.get_dialogs(limit=500):
+            chat_type = dialog.chat.type
+            if chat_type not in SUPPORTED_CHAT_TYPES:
                 continue
 
             if dialog.top_message and dialog.top_message.date:
