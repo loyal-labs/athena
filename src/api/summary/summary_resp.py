@@ -90,12 +90,3 @@ class ChatSummaryResponse(BaseModel):
     page: int = Field(0, description="Page of the summary")
 
     chats: list[ChatSummary] = Field(..., description="Chats")
-
-
-class MarkAsReadRequest(BaseModel):
-    """
-    Mark as read request is a request to mark a chat as read.
-    """
-
-    chat_id: int = Field(..., description="Chat ID")
-    max_id: int | None = Field(None, description="Max ID")

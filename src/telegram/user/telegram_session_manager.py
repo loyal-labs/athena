@@ -1,10 +1,15 @@
 import asyncio
 import logging
 from collections import OrderedDict
+from collections.abc import Coroutine
 from datetime import datetime, timedelta
+from typing import Any
 
+from pyrogram.handlers.handler import Handler
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.shared.database import Database
+from src.telegram.user.inbox.inbox_handlers import TelegramUserMessageHandlers
 from src.telegram.user.onboarding.onboarding_schemas import OnboardingSchema
 from src.telegram.user.storage.storage_schema import TelegramSessions
 from src.telegram.user.telegram_user_client import TelegramUser
@@ -103,9 +108,12 @@ class UserSessionManager:
             if owner_id in self._sessions:
                 self._last_access[owner_id] = datetime.now()
                 self._sessions.move_to_end(owner_id)  # LRU update
+                logger.debug("Returning existing MTProto session for owner")
                 return self._sessions[owner_id]
 
             user_session_db = await TelegramSessions.get(owner_id, db_session)
+            assert user_session_db is not None, "No session found for owner"
+            logger.debug(f"Session found for owner {owner_id}")
 
             user_session = await TelegramUser.create(
                 user_session_db.dc_id,
@@ -113,8 +121,19 @@ class UserSessionManager:
                 owner_id,
             )
 
+            logger.debug("Creating new MTProto session for owner")
+
+            # Setup handlers
+            inbox_handlers = TelegramUserMessageHandlers().inbox_filters
+
+            handlers = [
+                *inbox_handlers,
+            ]
+
             # Start the session
-            await user_session.start()
+            logger.debug("Starting MTProto user session")
+            print("Starting MTProto user session")
+            await user_session.start(handlers=handlers)
 
             # Cache the session
             self._sessions[owner_id] = user_session
@@ -272,6 +291,43 @@ class UserSessionManager:
         for owner_id in owner_ids:
             results[owner_id] = await self.extend_session_ttl(owner_id)
         return results
+
+    async def load_all_sessions(self, db: Database, handlers: list[Handler]):
+        """Load all sessions from the database."""
+        async with db.session() as session:
+            sessions = await TelegramSessions.get_all(session)
+
+        logger.info(f"Loading {len(sessions)} sessions from the database")
+
+        # Create all TelegramUser instances first
+        telegram_users: list[tuple[int, TelegramUser]] = []
+        for session in sessions:
+            try:
+                user = await TelegramUser.create(
+                    session.dc_id,
+                    session.auth_key,
+                    session.owner_id,
+                )
+                telegram_users.append((session.owner_id, user))
+            except Exception as e:
+                logger.error(
+                    f"Failed to create session for owner {session.owner_id}: {e}"
+                )
+
+        # Start all clients concurrently (inspired by compose)
+        start_tasks: list[Coroutine[Any, Any, None]] = []
+
+        for _, user in telegram_users:
+            start_tasks.append(user.start(handlers=handlers))
+
+        await asyncio.gather(*start_tasks, return_exceptions=True)
+
+        # Cache all successfully started sessions
+        for owner_id, user in telegram_users:
+            self._sessions[owner_id] = user
+            self._last_access[owner_id] = datetime.now()
+
+        logger.info(f"Loaded {len(telegram_users)} sessions from the database")
 
 
 class UserSessionFactory:

@@ -34,24 +34,23 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         init_factory(container, "telegram_factory"),
         init_factory(container, "db_factory"),
         init_factory(container, "llm_factory"),
+        init_factory(container, "user_session_factory"),
     ]
-    (
-        _,
-        _,
-        telegram,
-        db,
-        _,
-    ) = await asyncio.gather(*key_service_init_tasks)
+    (_, _, telegram, db, _, tg_user_session) = await asyncio.gather(
+        *key_service_init_tasks
+    )
 
     # --- Service Initialization ---
     try:
         logger.debug("Initializing services")
-        # --- Telegram ---
-
+        # --- Telegram Bot ---
         message_handlers = container.messages_handlers()
         login_handlers = container.login_handlers()
         handlers = login_handlers.login_handlers + message_handlers.message_handlers
         await telegram.start(handlers=handlers)
+
+        inbox_handlers = container.inbox_handlers()
+        await tg_user_session.load_all_sessions(db, inbox_handlers.inbox_filters)
 
         # --- Database ---
 
@@ -68,6 +67,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # --- Database Shutdown ---
     try:
         await db.close()
+        await tg_user_session.stop_all_sessions()
     except Exception as e:
         logger.exception("Error closing database")
         raise e

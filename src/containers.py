@@ -16,6 +16,8 @@ from src.shared.secrets import OnePasswordManager
 from src.telegram.bot.client.telegram_bot import TelegramBotFactory
 from src.telegram.bot.login.login_handlers import LoginHandlers
 from src.telegram.bot.messages.messages_handlers import MessageHandlers
+from src.telegram.user.inbox.inbox_handlers import TelegramUserMessageHandlers
+from src.telegram.user.telegram_session_manager import UserSessionFactory
 
 logger = logging.getLogger("athena.containers")
 
@@ -41,6 +43,10 @@ class Container(containers.DeclarativeContainer):
     telegram_factory = providers.Singleton(TelegramBotFactory)
     messages_handlers = providers.Singleton(MessageHandlers)
     login_handlers = providers.Singleton(LoginHandlers)
+
+    # -- Telegram Users --
+    user_session_factory = providers.Singleton(UserSessionFactory)
+    inbox_handlers = providers.Singleton(TelegramUserMessageHandlers)
 
     # -- LLM Providers --
     llm_factory = providers.Singleton(LLMFactory)
@@ -116,6 +122,7 @@ async def init_factory(container: Container, name: str) -> Any:
         "db_factory": container.db_factory,
         "llm_factory": container.llm_factory,
         "telegram_factory": container.telegram_factory,
+        "user_session_factory": container.user_session_factory,
     }
 
     assert name is not None, "Factory name is not set"

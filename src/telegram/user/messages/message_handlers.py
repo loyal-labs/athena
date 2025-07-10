@@ -17,7 +17,7 @@ logger = logging.getLogger("athena.telegram.user.summary.handlers")
 
 class TelegramUserMessageHandlers:
     @staticmethod
-    async def raw_update_handler(
+    async def raw_update_processor(
         client: Client, raw_update: Update, users: list[User], chats: list[Chat]
     ):
         if isinstance(raw_update, UpdateReadHistoryInbox):
@@ -80,5 +80,9 @@ class TelegramUserMessageHandlers:
             MessageHandler(
                 self.incoming_message,
                 filters.incoming | filters.me,
+            ),
+            RawUpdateHandler(
+                self.raw_update_handler,
+                filters.all,
             ),
         ]

@@ -257,7 +257,11 @@ class PostgresStorage(Storage):
 
         # Fall back to database
         async with self.database_instance.session() as session:
-            peer = await TelegramPeers.get_by_id(self.telegram_id, peer_id, session)
+            try:
+                peer = await TelegramPeers.get_by_id(self.telegram_id, peer_id, session)
+            except Exception as e:
+                print(e)
+                raise KeyError(f"ID not found: {peer_id}") from e
 
             if peer is None:
                 raise KeyError(f"ID not found: {peer_id}")

@@ -1,8 +1,10 @@
 import asyncio
+import logging
 import random
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import JSONResponse
 
 from src.api.summary.summary_constants import STEP
 from src.api.summary.summary_resp import (
@@ -11,22 +13,25 @@ from src.api.summary.summary_resp import (
     ChatSummaryResponse,
     ChatSummaryTopic,
     ChatTypes,
-    MarkAsReadRequest,
 )
 from src.shared.database import Database, DatabaseFactory
 from src.shared.dependencies import (
     TelegramLoginParams,
     get_database,
     get_summary_service,
+    get_user_session_manager,
     verify_telegram_auth,
 )
 from src.telegram.user.summary.summary_schemas import (
     TelegramChatSummary as TelegramChatSummary,
 )
+from src.telegram.user.summary.summary_schemas import TelegramMessage
 from src.telegram.user.summary.summary_service import SummaryService
-from src.telegram.user.telegram_session_manager import UserSessionFactory
+from src.telegram.user.telegram_session_manager import UserSessionManager
 
 router = APIRouter()
+
+logger = logging.getLogger("src.api.summary.summary_router")
 
 
 @router.get("/", response_model=ChatSummaryResponse)
@@ -114,27 +119,36 @@ async def get_chat_summary(
         )
 
 
-@router.post("/read")
+@router.get("/read")
 async def mark_as_read(
-    request: MarkAsReadRequest,
     # params: Annotated[TelegramLoginParams, Depends(verify_telegram_auth)],
+    summary_service: Annotated[SummaryService, Depends(get_summary_service)],
+    session_manager: Annotated[UserSessionManager, Depends(get_user_session_manager)],
     db: Annotated[Database, Depends(get_database)],
-) -> None:
+    chat_id: int = Query(..., description="Chat ID"),
+    max_id: int = Query(..., description="Max ID"),
+) -> JSONResponse:
     """
     Mark a chat as read.
     """
     owner_id = 714862471
-    session_manager = await UserSessionFactory.get_instance()
-
-    async with db.session() as session:
-        user_client_object = await session_manager.get_or_create_session(
-            owner_id, session
-        )
-
-    user_client = user_client_object.get_client()
 
     try:
-        summary_service = SummaryService()
-        await summary_service.mark_as_read(user_client, request.chat_id, request.max_id)
+        async with db.session() as session:
+            user_client_object = await session_manager.get_or_create_session(
+                owner_id, session
+            )
+            user_client = user_client_object.get_client()
+
+            db_job = TelegramMessage.mark_as_read(session, owner_id, chat_id, max_id)
+            tg_job = summary_service.mark_as_read(user_client, chat_id, max_id)
+
+            await asyncio.gather(db_job, tg_job)
+
+        return JSONResponse(
+            status_code=200,
+            content={"message": "Success"},
+        )
     except Exception as e:
+        logger.error(f"Error marking chat as read: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e

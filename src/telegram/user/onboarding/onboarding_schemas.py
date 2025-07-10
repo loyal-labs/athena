@@ -19,7 +19,9 @@ class OnboardingSchema(SQLModel, table=True):
     )
 
     owner_id: int = Field(sa_type=BigInteger, primary_key=True, unique=True)
-    is_onboarded: bool = Field(sa_type=Boolean)
+
+    is_onboarded: bool = Field(sa_type=Boolean, default=False)
+    is_bot_pinned: bool = Field(sa_type=Boolean, default=False)
     created_at: datetime = Field(
         sa_type=DateTime,
         nullable=False,
@@ -40,7 +42,7 @@ class OnboardingSchema(SQLModel, table=True):
         if fetched_result is not None:
             return
 
-        stmt = insert(cls).values(owner_id=owner_id, is_onboarded=False)
+        stmt = insert(cls).values(owner_id=owner_id)
         await session.execute(stmt)
         await session.commit()
 
@@ -63,6 +65,20 @@ class OnboardingSchema(SQLModel, table=True):
         assert fetched_result is not None, "Onboarding status not found"
 
         fetched_result.is_onboarded = True
+        fetched_result.is_bot_pinned = True
+        fetched_result.updated_at = datetime.now()
+        await session.commit()
+        await session.refresh(fetched_result)
+
+    @classmethod
+    async def mark_as_bot_pinned(cls, owner_id: int, session: AsyncSession) -> None:
+        stmt = select(cls).where(cls.owner_id == owner_id)
+        result = await session.execute(stmt)
+        fetched_result = result.scalar_one_or_none()
+
+        assert fetched_result is not None, "Onboarding status not found"
+
+        fetched_result.is_bot_pinned = True
         fetched_result.updated_at = datetime.now()
         await session.commit()
         await session.refresh(fetched_result)

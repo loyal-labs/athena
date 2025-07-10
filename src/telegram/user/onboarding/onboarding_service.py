@@ -5,6 +5,8 @@ import time
 import pandas as pd
 from pyrogram.client import Client
 from pyrogram.enums import ChatAction, ParseMode
+from pyrogram.raw.functions.messages.toggle_dialog_pin import ToggleDialogPin
+from pyrogram.raw.types.input_dialog_peer import InputDialogPeer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.shared.base import BaseService
@@ -41,6 +43,12 @@ class OnboardingService(BaseService):
         """Run the complete onboarding pipeline for a new user."""
         bot = await TelegramBotFactory.get_instance()
         bot_client = bot.get_client()
+
+        assert bot_client.me is not None
+        assert bot_client.me.username is not None
+
+        bot_id = bot_client.me.id
+
         summary_service = SummaryService()
         try:
             # Get user session
@@ -53,7 +61,6 @@ class OnboardingService(BaseService):
                     owner_id, db_session
                 )
                 user_client = user_client_object.get_client()
-                user_client.save_file("user_client.session")
 
                 logger.debug(f"Sending welcome message to user {owner_id}")
                 # Step 1: Send welcome message
@@ -70,6 +77,7 @@ class OnboardingService(BaseService):
                 )
                 logger.debug(f"Interests analyzed for user {owner_id}")
 
+                # Step 3: Send personalized message
                 logger.debug(f"Sending personalized message to user {owner_id}")
                 await self._send_interest_message(bot_client, owner_id, interests)
 
@@ -81,6 +89,8 @@ class OnboardingService(BaseService):
                 logger.debug(f"Downloaded unread chats for user {owner_id}")
                 await self.__insert_empty_chat_summaries(owner_id, db_session)
 
+                # Step 4: Pin the bot and mark as is_pinned and onboarded
+                await self._pin_bot(user_client, bot_id)
                 await self._mark_as_onboarded(owner_id, db_session)
                 logger.debug(f"Marking user {owner_id} as onboarded")
 
@@ -198,7 +208,27 @@ class OnboardingService(BaseService):
 
         await bot_client.send_message(owner_id, message, parse_mode=ParseMode.HTML)
 
-    async def _mark_as_onboarded(self, owner_id: int, db_session: AsyncSession) -> bool:
+    async def _mark_as_onboarded(self, owner_id: int, db_session: AsyncSession) -> None:
         """Mark the user as onboarded in the database."""
         await OnboardingSchema.mark_as_onboarded(owner_id, db_session)
-        return True
+
+    async def _pin_bot(
+        self,
+        user_client: Client,
+        peer_id: int,
+    ) -> None:
+        try:
+            peer = await user_client.resolve_peer(peer_id)  # Get the peer
+
+            dialog_peer = InputDialogPeer(peer=peer)  # type: ignore
+
+            await user_client.invoke(
+                ToggleDialogPin(
+                    peer=dialog_peer,  # type: ignore
+                    pinned=True,
+                )
+            )
+
+        except Exception as e:
+            logger.error(f"Error pinning bot {peer_id}: {e}")
+            raise e

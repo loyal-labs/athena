@@ -197,34 +197,23 @@ class TelegramEntity(SQLModel, table=True):
         return list(result.scalars().all())
 
     @classmethod
-    async def get_filtered(
+    async def update_unread_count(
         cls,
-        owner_id: int,
         session: AsyncSession,
-        chat_type: str | None = None,
-        is_pinned: bool | None = None,
-        min_rating: float | None = None,
-        limit: int | None = None,
-    ) -> list["TelegramEntity"]:
-        """Get filtered TelegramEntity records with various criteria."""
-        query = select(cls).where(cls.owner_id == owner_id)
-
-        if chat_type is not None:
-            query = query.where(cls.chat_type == chat_type)
-
-        if is_pinned is not None:
-            query = query.where(cls.is_pinned == is_pinned)
-
-        if min_rating is not None:
-            query = query.where(cls.rating >= min_rating)
-
-        query = query.order_by(cls.rating.desc())  # type: ignore
-
-        if limit is not None:
-            query = query.limit(limit)
-
-        result = await session.execute(query)
-        return list(result.scalars().all())
+        owner_id: int,
+        chat_id: int,
+        unread_count: int,
+        commit: bool = False,
+    ) -> None:
+        """Update the unread count for a TelegramEntity."""
+        stmt = (
+            update(cls)
+            .where(col(cls.owner_id) == owner_id, col(cls.chat_id) == chat_id)
+            .values(unread_count=unread_count)
+        )
+        await session.execute(stmt)
+        if commit:
+            await session.commit()
 
 
 class TelegramMessage(SQLModel, table=True):
@@ -417,20 +406,29 @@ class TelegramMessage(SQLModel, table=True):
 
     @classmethod
     async def mark_as_read(
-        cls, owner_id: int, chat_id: int, max_id: int, session: AsyncSession
+        cls,
+        session: AsyncSession,
+        owner_id: int,
+        chat_id: int,
+        max_id: int | None = None,
+        commit: bool = True,
     ) -> None:
         """Mark a message as read."""
+        if max_id is None:
+            max_id = 0
+
         stmt = (
             update(cls)
             .where(
                 col(cls.owner_id) == owner_id,
                 col(cls.chat_id) == chat_id,
-                col(cls.message_id) == max_id,
+                col(cls.message_id) <= max_id,
             )
             .values(is_read=True)
         )
         await session.execute(stmt)
-        await session.commit()
+        if commit:
+            await session.commit()
 
 
 class TelegramChatSummary(SQLModel, table=True):

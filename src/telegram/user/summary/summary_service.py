@@ -42,10 +42,14 @@ class SummaryService:
         assert isinstance(client, Client), "Client must be an instance of Client"
         assert chat_id is not None, "Chat ID is required"
 
-        if max_id is None:
-            await client.read_chat_history(chat_id)
-        else:
-            await client.read_chat_history(chat_id, max_id=max_id)
+        try:
+            if max_id is None:
+                await client.read_chat_history(chat_id)
+            else:
+                await client.read_chat_history(chat_id, max_id=max_id)
+        except Exception as e:
+            logger.error(f"Error marking chat as read: {e}")
+            return
 
     async def isolate_interests(self, client: Client) -> pd.DataFrame:
         """

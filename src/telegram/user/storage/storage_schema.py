@@ -77,6 +77,11 @@ class TelegramSessions(SQLModel, table=True):
         return fetched_result
 
     @classmethod
+    async def get_all(cls, session: AsyncSession) -> list["TelegramSessions"]:
+        result = await session.execute(select(cls))
+        return list(result.scalars().all())
+
+    @classmethod
     async def get_attribute(
         cls, owner_id: int, attr: str, session: AsyncSession
     ) -> Any:
