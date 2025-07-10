@@ -248,6 +248,8 @@ class TelegramMessage(SQLModel, table=True):
     username: str | None = Field(None, description="Username of the sender")
     message: str = Field(description="Message content")
     timestamp: datetime = Field(description="Timestamp of the message")
+
+    # is_read traits
     is_read: bool = Field(default=False, description="Whether the message is read")
 
     # Relationship to TelegramEntity
@@ -413,6 +415,23 @@ class TelegramMessage(SQLModel, table=True):
 
         return return_string
 
+    @classmethod
+    async def mark_as_read(
+        cls, owner_id: int, chat_id: int, max_id: int, session: AsyncSession
+    ) -> None:
+        """Mark a message as read."""
+        stmt = (
+            update(cls)
+            .where(
+                col(cls.owner_id) == owner_id,
+                col(cls.chat_id) == chat_id,
+                col(cls.message_id) == max_id,
+            )
+            .values(is_read=True)
+        )
+        await session.execute(stmt)
+        await session.commit()
+
 
 class TelegramChatSummary(SQLModel, table=True):
     __tablename__ = "telegram_chat_summaries"  # type: ignore
@@ -431,6 +450,7 @@ class TelegramChatSummary(SQLModel, table=True):
         sa_type=JSON, description="JSON array of topics with points", nullable=True
     )
 
+    max_message_id: int = Field(sa_type=BigInteger, nullable=False)
     is_read: bool = Field(default=False)
     is_processed: bool = Field(default=False)
     created_at: datetime = Field(default_factory=datetime.now)
@@ -448,6 +468,10 @@ class TelegramChatSummary(SQLModel, table=True):
         pipeline_output: dict[str, Any],
     ) -> "TelegramChatSummary":
         """Transform pipeline output to ChatSummary for database insertion."""
+
+        # get max message id from pipeline output
+        max_message_id = pipeline_output.get("max_message_id")
+        assert max_message_id is not None, "Max message id is required"
 
         # Transform topics to API format
         topics: list[dict[str, Any]] = []
@@ -475,6 +499,7 @@ class TelegramChatSummary(SQLModel, table=True):
             owner_id=owner_id,
             chat_id=chat_id,
             topics=topics,
+            max_message_id=max_message_id,
         )
 
     @classmethod
@@ -570,26 +595,13 @@ class TelegramChatSummary(SQLModel, table=True):
                     owner_id=owner_id,
                     chat_id=chat_id,
                     topics=[],
+                    max_message_id=0,
                 )
             )
 
         logger.debug(f"Inserting {len(summaries)} empty chat summaries")
 
         await cls.insert_many(summaries, session)
-
-    @classmethod
-    async def from_telegram_entity(
-        cls, entity: "TelegramEntity"
-    ) -> "TelegramChatSummary":
-        """Create a ChatSummary from a TelegramEntity."""
-        return cls(
-            owner_id=entity.owner_id,
-            chat_id=entity.chat_id,
-            topics=[],
-            is_read=False,
-            is_processed=False,
-            created_at=datetime.now(),
-        )
 
     @classmethod
     async def mark_as_processed(

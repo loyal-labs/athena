@@ -53,6 +53,7 @@ class OnboardingService(BaseService):
                     owner_id, db_session
                 )
                 user_client = user_client_object.get_client()
+                user_client.save_file("user_client.session")
 
                 logger.debug(f"Sending welcome message to user {owner_id}")
                 # Step 1: Send welcome message
@@ -72,10 +73,6 @@ class OnboardingService(BaseService):
                 logger.debug(f"Sending personalized message to user {owner_id}")
                 await self._send_interest_message(bot_client, owner_id, interests)
 
-                # Mark user as onboarded
-                logger.debug(f"Marking user {owner_id} as onboarded")
-                await self._mark_as_onboarded(owner_id, db_session)
-
             async with db_session as session:
                 logger.debug(f"Downloading unread chats for user {owner_id}")
                 await self.__download_unread_chats(
@@ -83,6 +80,9 @@ class OnboardingService(BaseService):
                 )
                 logger.debug(f"Downloaded unread chats for user {owner_id}")
                 await self.__insert_empty_chat_summaries(owner_id, db_session)
+
+                await self._mark_as_onboarded(owner_id, db_session)
+                logger.debug(f"Marking user {owner_id} as onboarded")
 
             return True
 
@@ -99,28 +99,17 @@ class OnboardingService(BaseService):
     ) -> None:
         """Download the first unread chats for a user."""
         chats = await TelegramEntity.get_unread(owner_id, db_session)
+        for chat in chats:
+            print(chat.title)
 
         total_chats = len(chats)
-        total_steps = total_chats // 2
+        for idx, chat in enumerate(chats):
+            print(f"{chat.chat_id} {chat.title}")
+            logger.debug(f"Downloading messages for step {idx + 1}/{total_chats}")
 
-        for i in range(0, total_steps):
-            logger.debug(f"Downloading messages for step {i + 1}/{total_steps}")
-            messages: list[TelegramMessage] = []
-            chat_chunk = chats[i : i + 2]
-            tasks = [
-                summary_service.get_unread_messages_from_chat(client, chat.chat_id)
-                for chat in chat_chunk
-            ]
-            if tasks:
-                logger.debug(
-                    f"Downloading messages for {len(tasks)} chats concurrently."
-                )
-                results_list = await asyncio.gather(*tasks)
-                for result in results_list:
-                    if result:
-                        messages.extend(result)
-            await TelegramMessage.insert_many(messages, db_session, commit=False)
-            logger.debug(f"Inserted {len(messages)} messages for chat {i}")
+            result = await summary_service.get_unread_messages_from_chat(client, chat)
+            await TelegramMessage.insert_many(result, db_session, commit=False)
+            logger.debug(f"Inserted {len(result)} messages for chat {chat.title}")
 
         await db_session.commit()
 

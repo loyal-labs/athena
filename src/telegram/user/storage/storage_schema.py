@@ -196,7 +196,6 @@ class TelegramPeers(SQLModel, table=True):
         )
 
         await session.execute(upsert_statement)
-        await session.commit()
 
 
 class TelegramUsernames(SQLModel, table=True):
@@ -218,15 +217,6 @@ class TelegramUsernames(SQLModel, table=True):
     owner_id: int = Field(sa_type=BigInteger)
     id: int = Field(sa_type=BigInteger, index=True)
     username: str = Field(sa_type=String, index=True)
-
-    @classmethod
-    async def delete_many(
-        cls, owner_id: int, values: list[int], session: AsyncSession
-    ) -> None:
-        statement = delete(cls).where(
-            col(cls.owner_id) == owner_id, col(cls.id).in_(values)
-        )
-        await session.execute(statement)
 
     @classmethod
     async def update_many(
@@ -265,7 +255,6 @@ class TelegramUsernames(SQLModel, table=True):
         )
 
         await session.execute(upsert_statement)
-        await session.commit()
 
 
 class TelegramUpdateState(SQLModel, table=True):
@@ -316,8 +305,6 @@ class TelegramUpdateState(SQLModel, table=True):
             },
         )
         await session.execute(upsert_statement)
-
-        await session.commit()
 
     @classmethod
     async def fetch_all(

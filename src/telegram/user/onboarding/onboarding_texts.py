@@ -8,15 +8,13 @@ hi! it's a pleasure to meet you!
 """
 
 WELCOME_MESSAGE_2 = """
-bear with me, i need a minute to go over your chats to grasp your interests and the best way I can help you.
+bear with me! i'm looking over your chats to get a sense of your interests.
 """
 
 WELCOME_MESSAGE_3 = f"""
-here's something i prepared for you while you're waiting. it's a short gist of who i am and things i can do!
-
-hope you like it {ONBOARDING_BLOG_HYPERLINK} 👉🏻👈🏻
+here, read this while you're waiting. {ONBOARDING_BLOG_HYPERLINK} hope you like it! 👉🏻👈🏻
 """
 
 WELCOME_MESSAGE_4 = """
-ok, let me get back to your messages though. i'll be back in a second.
+ok, give me a second now
 """

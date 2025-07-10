@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timedelta
 from logging import getLogger
 from typing import cast
@@ -12,7 +13,6 @@ from pyrogram.raw.types.peer_chat import PeerChat
 from pyrogram.raw.types.peer_user import PeerUser
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.shared.database import Database
 from src.telegram.user.summary.summary_dspy import summarize_chat_messages
 from src.telegram.user.summary.summary_schemas import (
     TelegramChatSummary,
@@ -26,7 +26,10 @@ SUPPORTED_CHAT_TYPES = [
     ChatType.CHANNEL,
     ChatType.PRIVATE,
 ]
-TOP_PEERS_LIMIT = 40
+TOP_PEERS_LIMIT = 80
+GET_CHAT_HISTORY_LIMIT = 500
+UNREAD_COUNT_CONTEXT_OFFSET = 20
+UNREAD_COUNT_NO_OFFSET_LIMIT = 100
 
 logger = getLogger("telegram.user.summary.summary_service")
 
@@ -51,13 +54,18 @@ class SummaryService:
         assert client is not None, "Client is required"
         assert isinstance(client, Client), "Client must be an instance of Client"
 
-        logger.debug("Getting dialogs...")
-        dialogs = await self.get_recent_dialogs(client)
+        logger.debug("Getting dialogs & top peers rating...")
+        dialogs_task = self.get_recent_dialogs(client)
+        top_peers_rating_task = self.get_top_peers_rating(client)
+
+        dialogs, top_peers_rating = await asyncio.gather(
+            dialogs_task, top_peers_rating_task
+        )
+
+        logger.debug("Parsing dialogs & top peers rating...")
         dialogs_array_dict = [dialog.model_dump() for dialog in dialogs]
         dialogs_df = pd.DataFrame(dialogs_array_dict)
 
-        logger.debug("Getting top peers rating...")
-        top_peers_rating = await self.get_top_peers_rating(client)
         top_peers_rating_df = pd.DataFrame(
             top_peers_rating.items(), columns=["chat_id", "rating"]
         )
@@ -78,49 +86,14 @@ class SummaryService:
         # Isolate channels
         channels_df = dialogs_df[dialogs_df["chat_type"] == "CHANNEL"]
         channels_df_with_rating = channels_df[channels_df["rating"] > 0]
-        channels_df_read = channels_df[channels_df["unread_count"] < 10]
 
         # Concatenate all dataframes
-        final_df = pd.concat(
-            [personal_df, group_df, channels_df_with_rating, channels_df_read]
-        )
+        final_df = pd.concat([personal_df, group_df, channels_df_with_rating])
+
         # drop duplicates by chat_id
         final_df = final_df.drop_duplicates(subset=["chat_id"])
         final_df = final_df.sort_values(by="rating", ascending=False)  # type: ignore
         return final_df
-
-    async def get_recent_messages(
-        self,
-        client: Client,
-        chat_id: int,
-        day_offset: int = 30,
-        username: str | None = None,
-    ) -> list[TelegramMessage]:
-        assert client is not None, "Client is required"
-        assert isinstance(client, Client), "Client must be an instance of Client"
-        assert day_offset > 0, "Day offset must be greater than 0"
-
-        start_date = datetime.now()
-        stop_date = start_date - timedelta(days=day_offset)
-        owner_id = client.me.id if client.me else -1
-
-        messages: list[TelegramMessage] = []
-
-        logger.debug(f"Getting recent messages for chat {chat_id}...")
-
-        chosen_param = username if username else chat_id
-        async for message in client.get_chat_history(chosen_param, limit=100):
-            if message.date and message.date < stop_date:
-                break
-
-            if message.text:
-                messages.append(
-                    TelegramMessage.extract_chat_message_info(
-                        message, owner_id, chat_id
-                    )
-                )
-        logger.debug(f"Found {len(messages)} messages")
-        return messages
 
     async def check_for_unread_summaries(
         self, owner_id: int, session: AsyncSession
@@ -170,50 +143,37 @@ class SummaryService:
     async def get_unread_messages_from_chat(
         self,
         client: Client,
-        chat_id: int,
+        chat: TelegramEntity,
     ) -> list[TelegramMessage]:
         assert client is not None, "Client is required"
         assert client.me is not None, "Client must be logged in"
         assert isinstance(client, Client), "Client must be an instance of Client"
-        assert chat_id is not None, "Chat ID is required"
 
-        unread_count_context_offset = 20
-        unread_count_no_offset_limit = 100
+        owner_id = chat.owner_id
+        unread_count = chat.unread_count
 
-        owner_id = client.me.id
-        get_chat = await client.get_chat(chat_id)
-        unread_count = get_chat.unread_count
-        if unread_count is None or unread_count == 0:
+        if unread_count == 0:
             return []
 
         response_messages: list[TelegramMessage] = []
 
-        if unread_count < unread_count_no_offset_limit:
-            unread_count += unread_count_context_offset
+        if unread_count < UNREAD_COUNT_NO_OFFSET_LIMIT and chat.chat_type != "CHANNEL":
+            unread_count += UNREAD_COUNT_CONTEXT_OFFSET
 
-        async for message in client.get_chat_history(chat_id, limit=unread_count):
+        async for message in client.get_chat_history(chat.chat_id, limit=unread_count):
             msg_obj = TelegramMessage.extract_chat_message_info(
-                message, owner_id, chat_id
+                message, owner_id, chat.chat_id
             )
             response_messages.append(msg_obj)
 
+        response_messages.sort(key=lambda x: x.timestamp)
+
+        for idx, message in enumerate(response_messages):
+            message.is_read = True
+            if idx == unread_count - 1:
+                break
+
         return response_messages
-
-    async def insert_unread_messages(
-        self,
-        client: Client,
-        chat_id: int,
-        db: Database,
-    ) -> None:
-        assert client is not None, "Client is required"
-        assert isinstance(client, Client), "Client must be an instance of Client"
-        assert chat_id is not None, "Chat ID is required"
-        assert db is not None, "Database is required"
-        assert isinstance(db, Database), "Database must be an instance of Database"
-
-        unread_messages = await self.get_unread_messages_from_chat(client, chat_id)
-        async with db.session() as session:
-            await TelegramMessage.insert_many(unread_messages, session)
 
     async def get_recent_dialogs(
         self, client: Client, day_offset: int = 30
@@ -240,7 +200,7 @@ class SummaryService:
 
         response_array: list[TelegramEntity] = []
 
-        async for dialog in client.get_dialogs(limit=500):
+        async for dialog in client.get_dialogs(limit=GET_CHAT_HISTORY_LIMIT):
             chat_type = dialog.chat.type
             if chat_type not in SUPPORTED_CHAT_TYPES:
                 continue

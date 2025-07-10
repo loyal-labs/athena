@@ -1,1 +1,1 @@
-BATCH_SIZE = 2
+STEP = 1

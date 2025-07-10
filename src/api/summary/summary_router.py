@@ -4,7 +4,8 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from src.api.summary.summary_schemas import (
+from src.api.summary.summary_constants import STEP
+from src.api.summary.summary_resp import (
     ChatSummary,
     ChatSummaryPoint,
     ChatSummaryResponse,
@@ -12,7 +13,6 @@ from src.api.summary.summary_schemas import (
     ChatTypes,
     MarkAsReadRequest,
 )
-from src.api.summary.summary_service import get_chats_for_summaries
 from src.shared.database import Database, DatabaseFactory
 from src.shared.dependencies import (
     TelegramLoginParams,
@@ -51,6 +51,16 @@ async def get_chat_summary(
         assert unread_chats is not None, "Unread chats are required"
         assert page <= unread_chats, "Page is out of bounds"
 
+        if unread_chats == 0:
+            return ChatSummaryResponse(
+                step=0,
+                total_pages=0,
+                page=page,
+                chats=[],
+            )
+        else:
+            unread_chats = unread_chats - 1
+
         chats = await TelegramChatSummary.get_chat_with_offset(owner_id, session, page)
 
         assert unread_chats is not None, "Unread chats are required"
@@ -76,7 +86,7 @@ async def get_chat_summary(
         assert chat.topics is not None, "Chat topics are required"
 
         return ChatSummaryResponse(
-            step=0,
+            step=STEP,
             total_pages=unread_chats,
             page=page,
             chats=[

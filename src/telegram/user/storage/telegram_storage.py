@@ -1,3 +1,4 @@
+import asyncio
 import time
 from typing import Any
 
@@ -40,11 +41,76 @@ class PostgresStorage(Storage):
     VERSION = 1
     USERNAMES_TTL = 8 * 60 * 60
 
+    # Batching settings
+    BATCH_TIME = 5.0
+    BATCH_SIZE = 50
+    PEERS_THRESHOLD = 25
+
     def __init__(self, name: str, telegram_id: int, database_instance: Database):
         super().__init__(name)
 
         self.telegram_id: int = telegram_id
         self.database_instance: Database = database_instance
+
+        # In-memory cache for immediate access
+        self._peer_cache: dict[int, TelegramPeers] = {}  # peer_id -> TelegramPeers
+        self._username_cache: dict[str, int] = {}  # username -> peer_id
+        self._phone_cache: dict[str, int] = {}  # phone -> peer_id
+
+        # Pending writes (still batch to database)
+        self._pending_peers: dict[int, TelegramPeers] = {}  # peer_id -> TelegramPeers
+        self._pending_usernames: dict[int, set[str]] = {}  # peer_id -> set of usernames
+        self._last_flush_time = time.time()
+        self._batch_lock = asyncio.Lock()
+        self._operation_count = 0
+
+    async def _should_flush(self) -> bool:
+        """More aggressive flushing since we have cache."""
+        current_time = time.time()
+        return (
+            self._operation_count >= self.BATCH_SIZE
+            or len(self._pending_peers) >= self.PEERS_THRESHOLD
+            or (current_time - self._last_flush_time) >= self.BATCH_TIME
+        )
+
+    async def _flush_batch(self, force: bool = False):
+        """Flush to database while keeping cache intact."""
+        async with self._batch_lock:
+            if not force and not await self._should_flush():
+                return
+
+            if not self._pending_peers and not self._pending_usernames:
+                return
+
+            # Flush peers to database
+            if self._pending_peers:
+                peers_list = list(self._pending_peers.values())
+
+                async with self.database_instance.no_auto_commit_session() as session:
+                    await TelegramPeers.update_many(peers_list, session)
+                    await session.commit()
+
+                self._pending_peers.clear()
+
+            # Flush usernames to database
+            if self._pending_usernames:
+                usernames_list = [
+                    TelegramUsernames(
+                        owner_id=self.telegram_id, id=peer_id, username=username
+                    )
+                    for peer_id, usernames in self._pending_usernames.items()
+                    for username in usernames
+                ]
+
+                async with self.database_instance.no_auto_commit_session() as session:
+                    await TelegramUsernames.update_many(usernames_list, session)
+                    await session.commit()
+
+                self._pending_usernames.clear()
+
+            # Reset counters
+            self._operation_count = 0
+            self._last_flush_time = time.time()
 
     @classmethod
     async def create(
@@ -94,66 +160,75 @@ class PostgresStorage(Storage):
             assert result is True, "Session not found"
 
     async def save(self) -> None:
-        raise NotImplementedError
+        """Force flush all pending operations."""
+        await self._flush_batch(force=True)
 
     async def close(self) -> None:
+        """Save and close."""
+        await self.save()
         assert self.database_instance is not None, "Database instance is not set"
         await self.database_instance.close()
 
     async def delete(self) -> None:
         raise NotImplementedError
 
-    async def create_session(
-        self,
-        dc_id: int,
-        api_id: int,
-        test_mode: bool,
-        auth_key: bytes,
-        user_id: int,
-        is_bot: bool,
-    ) -> None:
-        assert self.database_instance is not None, "Database instance is not set"
-        assert self.telegram_id is not None, "Telegram ID is not set"
-
-    async def update_peers(
-        self,
-        peers: list[tuple[int, int, str, str]],
-    ) -> None:
+    async def update_peers(self, peers: list[tuple[int, int, str, str]]) -> None:
+        """Update both cache and pending writes."""
         assert self.database_instance is not None, "Database instance is not set"
         assert self.telegram_id is not None, "Telegram ID is not set"
 
         if len(peers) == 0:
             return
 
-        peers_list = [
-            TelegramPeers(
-                owner_id=self.telegram_id,
-                id=peer[0],
-                access_hash=peer[1],
-                type=peer[2],
-                phone_number=peer[3],
-            )
-            for peer in peers
-        ]
+        async with self._batch_lock:
+            for peer in peers:
+                peer_id, access_hash, peer_type, phone_number = peer
 
-        async with self.database_instance.session() as session:
-            await TelegramPeers.update_many(peers_list, session)
+                # Create TelegramPeers object
+                peer_obj = TelegramPeers(
+                    owner_id=self.telegram_id,
+                    id=peer_id,
+                    access_hash=access_hash,
+                    type=peer_type,
+                    phone_number=phone_number,
+                )
+
+                # Update cache immediately (for instant access)
+                self._peer_cache[peer_id] = peer_obj
+                if phone_number:
+                    self._phone_cache[phone_number] = peer_id
+
+                # Queue for database write
+                self._pending_peers[peer_id] = peer_obj
+
+            self._operation_count += 1
+
+        # Non-blocking flush check
+        await self._flush_batch()
 
     async def update_usernames(self, usernames: list[tuple[int, list[str]]]) -> None:
+        """Update both cache and pending writes."""
         assert self.database_instance is not None, "Database instance is not set"
         assert self.telegram_id is not None, "Telegram ID is not set"
 
         if len(usernames) == 0:
             return
 
-        usernames_to_add = [
-            TelegramUsernames(owner_id=self.telegram_id, id=id, username=username)
-            for id, usernames in usernames
-            for username in usernames
-        ]
+        async with self._batch_lock:
+            for peer_id, username_list in usernames:
+                # Update cache immediately
+                for username in username_list:
+                    self._username_cache[username.lower()] = peer_id
 
-        async with self.database_instance.session() as session:
-            await TelegramUsernames.update_many(usernames_to_add, session)
+                # Queue for database write
+                if peer_id not in self._pending_usernames:
+                    self._pending_usernames[peer_id] = set()
+                self._pending_usernames[peer_id].update(username_list)
+
+            self._operation_count += 1
+
+        # Non-blocking flush check
+        await self._flush_batch()
 
     async def update_state(  # type: ignore
         self, value: object | int | TelegramUpdateState = object
@@ -171,21 +246,45 @@ class PostgresStorage(Storage):
                     await TelegramUpdateState.replace(self.telegram_id, value, session)
 
     async def get_peer_by_id(self, peer_id: int):
+        """Check cache first, then database."""
         assert self.database_instance is not None, "Database instance is not set"
         assert self.telegram_id is not None, "Telegram ID is not set"
 
+        # Check cache first (immediate access)
+        if peer_id in self._peer_cache:
+            peer = self._peer_cache[peer_id]
+            return get_input_peer(peer.id, peer.access_hash, peer.type)
+
+        # Fall back to database
         async with self.database_instance.session() as session:
             peer = await TelegramPeers.get_by_id(self.telegram_id, peer_id, session)
 
             if peer is None:
                 raise KeyError(f"ID not found: {peer_id}")
 
+            # Cache the result for future access
+            async with self._batch_lock:
+                self._peer_cache[peer_id] = peer
+
             return get_input_peer(peer.id, peer.access_hash, peer.type)
 
     async def get_peer_by_username(self, username: str):
+        """Check cache first, then database."""
         assert self.database_instance is not None, "Database instance is not set"
         assert self.telegram_id is not None, "Telegram ID is not set"
 
+        username_lower = username.lower()
+
+        # Check cache first
+        if username_lower in self._username_cache:
+            peer_id = self._username_cache[username_lower]
+            if peer_id in self._peer_cache:
+                peer = self._peer_cache[peer_id]
+                # Check TTL
+                if abs(time.time() - peer.last_update_on) <= self.USERNAMES_TTL:
+                    return get_input_peer(peer.id, peer.access_hash, peer.type)
+
+        # Fall back to database
         async with self.database_instance.session() as session:
             peer = await TelegramPeers.get_by_username(
                 self.telegram_id, username, session
@@ -197,12 +296,26 @@ class PostgresStorage(Storage):
             if abs(time.time() - peer.last_update_on) > self.USERNAMES_TTL:
                 raise KeyError(f"Username expired: {username}")
 
+            # Cache the result
+            async with self._batch_lock:
+                self._peer_cache[peer.id] = peer
+                self._username_cache[username_lower] = peer.id
+
             return get_input_peer(peer.id, peer.access_hash, peer.type)
 
     async def get_peer_by_phone_number(self, phone_number: str):
+        """Check cache first, then database."""
         assert self.database_instance is not None, "Database instance is not set"
         assert self.telegram_id is not None, "Telegram ID is not set"
 
+        # Check cache first
+        if phone_number in self._phone_cache:
+            peer_id = self._phone_cache[phone_number]
+            if peer_id in self._peer_cache:
+                peer = self._peer_cache[peer_id]
+                return get_input_peer(peer.id, peer.access_hash, peer.type)
+
+        # Fall back to database
         async with self.database_instance.session() as session:
             peer = await TelegramPeers.get_by_phone_number(
                 self.telegram_id, phone_number, session
@@ -210,6 +323,11 @@ class PostgresStorage(Storage):
 
             if peer is None:
                 raise KeyError(f"Phone number not found: {phone_number}")
+
+            # Cache the result
+            async with self._batch_lock:
+                self._peer_cache[peer.id] = peer
+                self._phone_cache[phone_number] = peer.id
 
             return get_input_peer(peer.id, peer.access_hash, peer.type)
 

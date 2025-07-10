@@ -222,6 +222,19 @@ class Database:
                 await session.rollback()
                 raise
 
+    @asynccontextmanager
+    async def no_auto_commit_session(self) -> AsyncGenerator[AsyncSession, None]:
+        """Provides a session that does NOT auto-commit - for batching operations."""
+        assert self.async_session is not None, "Async session is not set"
+
+        async with self.async_session() as session:
+            try:
+                yield session
+            except Exception as e:
+                logger.error("Session rollback due to error: %s", e, exc_info=True)
+                await session.rollback()
+                raise
+
     async def results_to_dict(self, results: Result[Any]) -> list[dict[str, Any]]:
         """
         Converts a SQLAlchemy Result object to a list of dictionaries.
