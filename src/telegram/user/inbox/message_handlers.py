@@ -37,9 +37,8 @@ class TelegramUserMessageHandlers:
         session: AsyncSession,
         owner_id: int,
         chat_id: int,
-    ) -> TelegramEntity:
+    ) -> TelegramEntity | None:
         telegram_entity = await TelegramEntity.get(owner_id, chat_id, session)
-        assert telegram_entity is not None, "Telegram entity not found"
         return telegram_entity
 
     @staticmethod
@@ -93,52 +92,50 @@ class TelegramUserMessageHandlers:
         assert message.chat is not None, "Message chat is None"
         assert message.chat.id is not None, "Message chat ID is None"
 
+        should_insert = True
+
         try:
             # If the entity was already in db, we selected it, insert
             telegram_entity = await TelegramUserMessageHandlers.__get_entity_from_db(
                 session, owner_id, chat_id
             )
-            if isinstance(telegram_entity, dict):
-                telegram_entity = TelegramEntity.from_dict(owner_id, telegram_entity)
 
-            unread_count = telegram_entity.unread_count + 1
-            await TelegramEntity.update_unread_count(
-                session, owner_id, chat_id, unread_count, commit=False
-            )
-        except AssertionError:
-            # if it's not in db, it must pass the checks
-            telegram_entity = await TelegramUserMessageHandlers.__get_entity_from_tg(
-                client, message, owner_id, chat_id
-            )
-            if isinstance(telegram_entity, dict):
-                telegram_entity = TelegramEntity.from_dict(owner_id, telegram_entity)
+            if telegram_entity:
+                if isinstance(telegram_entity, dict):
+                    telegram_entity = TelegramEntity.from_dict(
+                        owner_id, telegram_entity
+                    )
+
+                unread_count = telegram_entity.unread_count + 1
+                await TelegramEntity.update_unread_count(
+                    session, owner_id, chat_id, unread_count, commit=False
+                )
+            else:
+                telegram_entity = (
+                    await TelegramUserMessageHandlers.__get_entity_from_tg(
+                        client, message, owner_id, chat_id
+                    )
+                )
+
+                # TODO: find a better way to deal with cache resp
+                if isinstance(telegram_entity, dict):
+                    telegram_entity = TelegramEntity.from_dict(
+                        owner_id, telegram_entity
+                    )
+
+                should_insert = (
+                    await TelegramUserMessageHandlers.__should_insert_message(
+                        telegram_entity
+                    )
+                )
+                if should_insert:
+                    await telegram_entity.insert(session, commit=False)
 
         except Exception as e:
             logger.exception("Error getting telegram entity")
             raise e
 
-        should_insert = await TelegramUserMessageHandlers.__should_insert_message(
-            telegram_entity
-        )
-        if should_insert:
-            logger.debug("Inserting entity %s", telegram_entity)
-            # await telegram_entity.insert(session, commit=False)
-
-        logger.debug("Should insert: %s", should_insert)
         return should_insert
-
-    @staticmethod
-    async def __parse_and_insert_message(
-        session: AsyncSession,
-        message: Message,
-        owner_id: int,
-        chat_id: int,
-    ) -> None:
-        chat_message = TelegramMessage.extract_chat_message_info(
-            message, owner_id, chat_id
-        )
-        logger.debug("Inserting message %s", chat_message)
-        # await chat_message.insert(session, commit=False)
 
     @staticmethod
     async def incoming_message(client: Client, message: Message) -> None:
@@ -159,11 +156,9 @@ class TelegramUserMessageHandlers:
             )
 
             if should_insert:
-                await TelegramUserMessageHandlers.__parse_and_insert_message(
-                    session, message, owner_id, chat_id
-                )
-            else:
-                logger.debug("Entity found: decided against inserting message")
+                await TelegramMessage.extract_chat_message_info(
+                    message, owner_id, chat_id
+                ).insert(session, commit=False)
 
     @property
     def summary_handlers(self) -> list[Handler]:

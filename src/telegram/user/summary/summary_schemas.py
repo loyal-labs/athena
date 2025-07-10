@@ -166,7 +166,7 @@ class TelegramEntity(SQLModel, table=True):
         session.add(self)
         if commit:
             await session.commit()
-        await session.refresh(self)
+            await session.refresh(self)
         return self
 
     @classmethod
@@ -319,7 +319,7 @@ class TelegramMessage(SQLModel, table=True):
         session.add(self)
         if commit:
             await session.commit()
-        await session.refresh(self)
+            await session.refresh(self)
         return self
 
     @classmethod
@@ -659,11 +659,14 @@ class TelegramChatSummary(SQLModel, table=True):
         await session.execute(stmt)
         await session.commit()
 
-    async def insert(self, session: AsyncSession) -> "TelegramChatSummary":
+    async def insert(
+        self, session: AsyncSession, commit: bool = True
+    ) -> "TelegramChatSummary":
         """Insert a single ChatSummary into the database."""
         session.add(self)
-        await session.commit()
-        await session.refresh(self)
+        if commit:
+            await session.commit()
+            await session.refresh(self)
         return self
 
     @classmethod
