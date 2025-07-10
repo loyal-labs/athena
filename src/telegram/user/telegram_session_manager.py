@@ -292,7 +292,9 @@ class UserSessionManager:
             results[owner_id] = await self.extend_session_ttl(owner_id)
         return results
 
-    async def load_all_sessions(self, db: Database, handlers: list[Handler]):
+    async def load_all_sessions(
+        self, db: Database, handlers: list[Handler] | None = None
+    ):
         """Load all sessions from the database."""
         async with db.session() as session:
             sessions = await TelegramSessions.get_all(session)

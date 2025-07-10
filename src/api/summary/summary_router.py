@@ -6,7 +6,6 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
 
-from src.api.summary.summary_constants import STEP
 from src.api.summary.summary_resp import (
     ChatSummary,
     ChatSummaryPoint,
@@ -14,13 +13,12 @@ from src.api.summary.summary_resp import (
     ChatSummaryTopic,
     ChatTypes,
 )
-from src.shared.database import Database, DatabaseFactory
+from src.shared.database import Database
 from src.shared.dependencies import (
-    TelegramLoginParams,
     get_database,
+    get_owner_id,
     get_summary_service,
     get_user_session_manager,
-    verify_telegram_auth,
 )
 from src.telegram.user.summary.summary_schemas import (
     TelegramChatSummary as TelegramChatSummary,
@@ -36,8 +34,9 @@ logger = logging.getLogger("src.api.summary.summary_router")
 
 @router.get("/", response_model=ChatSummaryResponse)
 async def get_chat_summary(
-    # params: Annotated[TelegramLoginParams, Depends(verify_telegram_auth)],
+    owner_id: Annotated[int, Depends(get_owner_id)],
     summary_service: Annotated[SummaryService, Depends(get_summary_service)],
+    db: Annotated[Database, Depends(get_database)],
     page: int = Query(0, description="Page of the summary"),
 ) -> ChatSummaryResponse:
     """
@@ -45,8 +44,6 @@ async def get_chat_summary(
     Initial request returns 2 summaries and starts processing more.
     Subsequent requests return pre-processed summaries.
     """
-    db = await DatabaseFactory.get_instance()
-    owner_id = 714862471
     pictures = ["https://github.com/shadcn.png", "https://github.com/leerob.png"]
 
     async with db.session() as session:
@@ -58,7 +55,9 @@ async def get_chat_summary(
 
         if unread_chats == 0:
             return ChatSummaryResponse(
-                step=0,
+                owner_id=owner_id,
+                chat_id=0,
+                max_id=0,
                 total_pages=0,
                 page=page,
                 chats=[],
@@ -77,6 +76,7 @@ async def get_chat_summary(
         title = chat.telegram_entity.title or ""
         chat_type = chat.telegram_entity.chat_type or ""
         unread_count = chat.telegram_entity.unread_count
+        max_message_id = chat.max_message_id
 
         if chat.topics is None or len(chat.topics) == 0:
             chat = await summary_service.create_chat_summary(
@@ -91,7 +91,9 @@ async def get_chat_summary(
         assert chat.topics is not None, "Chat topics are required"
 
         return ChatSummaryResponse(
-            step=STEP,
+            owner_id=owner_id,
+            chat_id=chat_id,
+            max_id=max_message_id,
             total_pages=unread_chats,
             page=page,
             chats=[
@@ -121,7 +123,7 @@ async def get_chat_summary(
 
 @router.get("/read")
 async def mark_as_read(
-    # params: Annotated[TelegramLoginParams, Depends(verify_telegram_auth)],
+    owner_id: Annotated[int, Depends(get_owner_id)],
     summary_service: Annotated[SummaryService, Depends(get_summary_service)],
     session_manager: Annotated[UserSessionManager, Depends(get_user_session_manager)],
     db: Annotated[Database, Depends(get_database)],
@@ -131,8 +133,6 @@ async def mark_as_read(
     """
     Mark a chat as read.
     """
-    owner_id = 714862471
-
     try:
         async with db.session() as session:
             user_client_object = await session_manager.get_or_create_session(

@@ -90,8 +90,11 @@ async def verify_telegram_auth(
     bot_token = bot.api_token
     assert bot_token is not None, "Bot token is not set"
 
-    hmac_result = hmac_check(params, bot)
+    print(bot_token)
+
+    hmac_result = hmac_check(params.model_dump(exclude_none=True), bot_token)
     auth_date_result = auth_date_check(params)
+    print(hmac_result, auth_date_result)
 
     try:
         assert hmac_result, "HMAC check failed"
@@ -106,6 +109,12 @@ async def verify_telegram_auth(
     return params
 
 
+async def get_owner_id(
+    params: Annotated[TelegramLoginParams, Depends(verify_telegram_auth)],
+) -> int:
+    return int(params.id)
+
+
 #
 # -- Helper Functions --
 #
@@ -113,17 +122,14 @@ async def verify_telegram_auth(
 AUTH_DATA_MAX_AGE = 60 * 60 * 24 * 30  # 30 days # TODO: implement JWT signing later on
 
 
-def hmac_check(params: TelegramLoginParams, bot: TelegramBot) -> bool:
-    bot_token = bot.api_token
-    assert bot_token is not None, "Bot token is not set"
-
+def hmac_check(params: dict[str, str], bot_token: str) -> bool:
     check_string = "\n".join(
-        f"{k}={v}" for k, v in sorted(params.model_dump().items()) if k != "hash"
+        f"{k}={v}" for k, v in sorted(params.items()) if k != "hash"
     )
     secret = hashlib.sha256(bot_token.encode()).digest()
     hmac_result = (
         hmac.new(secret, check_string.encode(), hashlib.sha256).hexdigest()
-        == params.hash
+        == params["hash"]
     )
     return hmac_result
 
