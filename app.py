@@ -50,7 +50,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await telegram.start(handlers=handlers)
 
         inbox_handlers = container.inbox_handlers()
-        await tg_user_session.load_all_sessions(db, inbox_handlers.inbox_filters)
+        user_message_handlers = container.user_message_handlers()
+        handlers = inbox_handlers.inbox_filters + user_message_handlers.summary_handlers
+
+        await tg_user_session.load_all_sessions(db, handlers)
 
         # --- Database ---
 

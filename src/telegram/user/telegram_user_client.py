@@ -93,8 +93,8 @@ class TelegramUser:
     async def register_handlers(self, handlers: list[Handler]) -> None:
         """Registers the handlers to the Telegram client."""
         assert self.client is not None, "Client is not initialized"
-        for handler in handlers:
-            self.client.add_handler(handler)
+        for idx, handler in enumerate(handlers):
+            self.client.add_handler(handler, idx)
 
     async def start(
         self, blocking: bool = False, handlers: list[Handler] | None = None

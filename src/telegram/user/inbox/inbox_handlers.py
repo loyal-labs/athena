@@ -18,7 +18,7 @@ from src.telegram.user.summary.summary_schemas import TelegramEntity, TelegramMe
 logger = logging.getLogger("athena.telegram.user.summary.handlers")
 
 
-class TelegramUserMessageHandlers:
+class TelegramInboxHandlers:
     INBOX_UPDATE_FILTER_NAME = "inbox_update_filter"
 
     @staticmethod
@@ -39,11 +39,11 @@ class TelegramUserMessageHandlers:
             async with database.session() as session:
                 # These updates show the messages the user has read
                 if is_read_history:
-                    await TelegramUserMessageHandlers.process_inbox_update(
+                    await TelegramInboxHandlers.process_inbox_update(
                         owner_id, raw_update, session
                     )
                 elif is_read_channel:
-                    await TelegramUserMessageHandlers.process_channel_inbox_update(
+                    await TelegramInboxHandlers.process_channel_inbox_update(
                         owner_id, raw_update, session
                     )
 

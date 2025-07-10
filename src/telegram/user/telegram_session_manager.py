@@ -9,7 +9,7 @@ from pyrogram.handlers.handler import Handler
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.shared.database import Database
-from src.telegram.user.inbox.inbox_handlers import TelegramUserMessageHandlers
+from src.telegram.user.inbox.inbox_handlers import TelegramInboxHandlers
 from src.telegram.user.onboarding.onboarding_schemas import OnboardingSchema
 from src.telegram.user.storage.storage_schema import TelegramSessions
 from src.telegram.user.telegram_user_client import TelegramUser
@@ -124,7 +124,7 @@ class UserSessionManager:
             logger.debug("Creating new MTProto session for owner")
 
             # Setup handlers
-            inbox_handlers = TelegramUserMessageHandlers().inbox_filters
+            inbox_handlers = TelegramInboxHandlers().inbox_filters
 
             handlers = [
                 *inbox_handlers,

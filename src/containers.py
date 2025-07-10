@@ -16,7 +16,8 @@ from src.shared.secrets import OnePasswordManager
 from src.telegram.bot.client.telegram_bot import TelegramBotFactory
 from src.telegram.bot.login.login_handlers import LoginHandlers
 from src.telegram.bot.messages.messages_handlers import MessageHandlers
-from src.telegram.user.inbox.inbox_handlers import TelegramUserMessageHandlers
+from src.telegram.user.inbox.inbox_handlers import TelegramInboxHandlers
+from src.telegram.user.inbox.message_handlers import TelegramUserMessageHandlers
 from src.telegram.user.telegram_session_manager import UserSessionFactory
 
 logger = logging.getLogger("athena.containers")
@@ -46,7 +47,8 @@ class Container(containers.DeclarativeContainer):
 
     # -- Telegram Users --
     user_session_factory = providers.Singleton(UserSessionFactory)
-    inbox_handlers = providers.Singleton(TelegramUserMessageHandlers)
+    inbox_handlers = providers.Singleton(TelegramInboxHandlers)
+    user_message_handlers = providers.Singleton(TelegramUserMessageHandlers)
 
     # -- LLM Providers --
     llm_factory = providers.Singleton(LLMFactory)

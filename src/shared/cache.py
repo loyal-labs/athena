@@ -346,7 +346,6 @@ def disk_cache(
                     func, key_params, args, kwargs
                 )  # Pass args/kwargs
                 cache = get_disk_cache()
-
                 # --- Cache Read ---
                 cached_data = cache.get(cache_key)  # type: ignore
                 if cached_data is not None:

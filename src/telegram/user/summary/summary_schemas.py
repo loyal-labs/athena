@@ -140,10 +140,32 @@ class TelegramEntity(SQLModel, table=True):
             rating=0.0,
         )
 
-    async def insert(self, session: AsyncSession) -> "TelegramEntity":
+    @classmethod
+    def from_dict(cls, owner_id: int, data: dict[str, Any]) -> "TelegramEntity":
+        return cls(
+            owner_id=owner_id,
+            chat_id=data["chat_id"],
+            chat_type=data["chat_type"],
+            title=data["title"],
+            username=data["username"],
+            small_pfp=data["small_pfp"],
+            total_messages=data["total_messages"],
+            unread_count=data["unread_count"],
+            last_message_date=data["last_message_date"],
+            is_pinned=data["is_pinned"],
+            members_count=data["members_count"],
+            is_creator=data["is_creator"],
+            is_admin=data["is_admin"],
+            rating=data["rating"],
+        )
+
+    async def insert(
+        self, session: AsyncSession, commit: bool = True
+    ) -> "TelegramEntity":
         """Insert a single TelegramEntity into the database."""
         session.add(self)
-        await session.commit()
+        if commit:
+            await session.commit()
         await session.refresh(self)
         return self
 
@@ -270,6 +292,10 @@ class TelegramMessage(SQLModel, table=True):
             else:
                 username = None
 
+            # If that's your own message, it's read
+            if message_object.outgoing:
+                is_read = True
+
             timestamp = message_object.date
 
             return cls(
@@ -286,10 +312,13 @@ class TelegramMessage(SQLModel, table=True):
             logger.error(f"Error extracting chat message info: {e}")
             raise e
 
-    async def insert(self, session: AsyncSession) -> "TelegramMessage":
+    async def insert(
+        self, session: AsyncSession, commit: bool = True
+    ) -> "TelegramMessage":
         """Insert a single ChatMessage into the database."""
         session.add(self)
-        await session.commit()
+        if commit:
+            await session.commit()
         await session.refresh(self)
         return self
 

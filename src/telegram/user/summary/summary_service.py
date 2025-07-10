@@ -26,10 +26,15 @@ SUPPORTED_CHAT_TYPES = [
     ChatType.CHANNEL,
     ChatType.PRIVATE,
 ]
+
 TOP_PEERS_LIMIT = 80
 GET_CHAT_HISTORY_LIMIT = 500
 UNREAD_COUNT_CONTEXT_OFFSET = 20
 UNREAD_COUNT_NO_OFFSET_LIMIT = 100
+
+LOWEST_RATING = 0
+GROUP_HIGH_LIMIT = 200
+SUPERGROUP_HIGH_LIMIT = 200
 
 logger = getLogger("telegram.user.summary.summary_service")
 
@@ -84,15 +89,32 @@ class SummaryService:
         personal_df = dialogs_df[dialogs_df["chat_type"] == "PRIVATE"]
 
         # Isolate group chats
-        group_df = dialogs_df[dialogs_df["chat_type"].isin(["GROUP", "SUPERGROUP"])]  # type: ignore
-        group_df = group_df[group_df["rating"] > 0]
+        group_df = dialogs_df[dialogs_df["chat_type"] == "GROUP"]
+        group_with_rating = group_df[group_df["rating"] > LOWEST_RATING]
+        small_group = group_df[group_df["user_count"] < GROUP_HIGH_LIMIT]
+
+        # Isolate superchats data
+        supergroup_df = dialogs_df[dialogs_df["chat_type"] == "SUPERGROUP"]
+        supergroup_with_rating = supergroup_df[supergroup_df["rating"] > LOWEST_RATING]
+        small_supergroup = supergroup_df[
+            supergroup_df["user_count"] < SUPERGROUP_HIGH_LIMIT
+        ]
 
         # Isolate channels
         channels_df = dialogs_df[dialogs_df["chat_type"] == "CHANNEL"]
-        channels_df_with_rating = channels_df[channels_df["rating"] > 0]
+        channels_df_with_rating = channels_df[channels_df["rating"] > LOWEST_RATING]
 
         # Concatenate all dataframes
-        final_df = pd.concat([personal_df, group_df, channels_df_with_rating])
+        final_df = pd.concat(
+            [
+                personal_df,
+                group_with_rating,
+                small_group,
+                small_supergroup,
+                channels_df_with_rating,
+                supergroup_with_rating,
+            ]
+        )
 
         # drop duplicates by chat_id
         final_df = final_df.drop_duplicates(subset=["chat_id"])
