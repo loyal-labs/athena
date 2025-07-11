@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import re
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -34,8 +35,8 @@ class Database:
 
     def __init__(self):
         # Constants
-        self.host = self.default_host
-        self.port = self.default_port
+        self.host = os.getenv("POSTGRES_HOST", self.default_host)
+        self.port = int(os.getenv("POSTGRES_PORT", self.default_port))
 
         # From 1Password
         self.user: str | None = None

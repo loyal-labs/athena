@@ -6,9 +6,18 @@ from pyrogram.client import Client
 from pyrogram.enums import ChatAction
 from pyrogram.handlers.handler import Handler
 from pyrogram.handlers.message_handler import MessageHandler
-from pyrogram.types import Message
+from pyrogram.types import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    KeyboardButton,
+    LoginUrl,
+    Message,
+    ReplyKeyboardMarkup,
+    WebAppInfo,
+)
 
 from src.shared.database import DatabaseFactory
+from src.shared.secrets import SecretsFactory
 from src.telegram.bot.messages.messages_service import MessagesService
 from src.telegram.user.onboarding.onboarding_schemas import OnboardingSchema
 from src.telegram.user.onboarding.onboarding_service import OnboardingService
@@ -23,9 +32,69 @@ class MessageHandlers:
     """
 
     @staticmethod
-    async def start_message(client: Client, message: Message) -> Message:
-        response = await message.reply_text("Hello, world!")  # type: ignore
-        return response
+    async def start_message(client: Client, message: Message) -> None:
+        assert message.chat is not None, "Message chat is None"
+        assert message.chat.id is not None, "Message chat ID is None"
+
+        secrets_manager = await SecretsFactory.get_instance()
+        frontend_url = secrets_manager.frontend_url
+        auth_url = f"{frontend_url}/auth"
+
+        chat_id = message.chat.id
+
+        keyboard = ReplyKeyboardMarkup(
+            keyboard=[
+                [
+                    KeyboardButton(
+                        text="Sign in with Telegram",
+                        web_app=WebAppInfo(url=auth_url),
+                    )
+                ],
+            ],
+            resize_keyboard=True,
+            one_time_keyboard=True,
+            placeholder="Sign in with Telegram",
+        )
+
+        await client.send_message(
+            chat_id,
+            "let's get you started. you need to sign in with your telegram first",
+            reply_markup=keyboard,
+        )
+
+    @staticmethod
+    async def send_login_message(client: Client, message: Message) -> None:
+        assert message.chat is not None, "Message chat is None"
+        assert message.chat.id is not None, "Message chat ID is None"
+
+        secrets_manager = await SecretsFactory.get_instance()
+        frontend_url = secrets_manager.frontend_url
+        assert frontend_url is not None, "Frontend URL is required"
+
+        chat_id = message.chat.id
+
+        login_url_keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton(
+                        text="Open Athena",
+                        login_url=LoginUrl(
+                            url=frontend_url,
+                            forward_text="Open Athena",
+                            bot_username="athena_tgbot",
+                            button_id=1,
+                        ),
+                    ),
+                ]
+            ]
+        )
+
+        message_text = "you can get access to your chat summaries in the app"
+        message = await client.send_message(
+            chat_id,
+            message_text,
+            reply_markup=login_url_keyboard,
+        )
 
     @staticmethod
     async def login_command(client: Client, message: Message) -> None:
@@ -121,10 +190,17 @@ class MessageHandlers:
 
         return [
             MessageHandler(self.start_message, filters.command("start")),
+            MessageHandler(self.start_message, filters.command("signin")),
+            MessageHandler(self.send_login_message, filters.command("summary")),
             MessageHandler(self.help_message, filters.command("help")),
             MessageHandler(
                 self.response,
-                message_response & filters.incoming,
+                message_response
+                & filters.incoming
+                & ~filters.command("start")
+                & ~filters.command("signin")
+                & ~filters.command("summary")
+                & ~filters.command("login"),
             ),
             MessageHandler(self.login_command, filters.command("login")),
         ]

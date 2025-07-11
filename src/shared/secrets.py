@@ -36,6 +36,8 @@ class OnePasswordManager:
         self.client: Client | None = None
         self.host: str | None = None
         self.default_vault_uuid: str | None = None
+        self.frontend_url: str | None = None
+
         self.deployment: str = "local"
 
     @classmethod
@@ -50,6 +52,8 @@ class OnePasswordManager:
         logger.info("Creating OnePasswordManager")
         service_token = os.getenv(cls.secret_value, "")
         host = os.getenv(cls.host_value, "")
+        frontend_url = os.getenv("FRONTEND_URL")
+
         assert service_token is not None, f"{cls.secret_value} is not set"
         assert host is not None, f"{cls.host_value} is not set"
         logger.info("Fetched OnePassword service token")
@@ -57,6 +61,8 @@ class OnePasswordManager:
         self = cls()
         self.deployment = os.getenv("GLOBAL_APP_ENV", "local")
         self.host = host
+        self.frontend_url = frontend_url
+        assert self.frontend_url is not None, "FRONTEND_URL is required"
 
         await self.__init_client(service_token)
         logger.info("OnePasswordManager initialized")

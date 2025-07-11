@@ -7,6 +7,7 @@ from pyrogram.client import Client
 from pyrogram.enums import ParseMode
 from pyrogram.handlers.handler import Handler
 from pyrogram.methods.utilities.idle import idle
+from pyrogram.types import BotCommand, MenuButtonCommands
 
 from src.shared.secrets import OnePasswordManager, SecretsFactory
 
@@ -40,6 +41,7 @@ class TelegramBot:
         self.api_id: str | None = None
         self.api_hash: str | None = None
         self.client: Client | None = None
+        self.frontend_url: str | None = None
 
     @classmethod
     async def create(cls):
@@ -79,6 +81,7 @@ class TelegramBot:
         self.api_token = fetched_secrets.get(TelegramEnvFields.BOT_TOKEN.value)
         self.api_id = fetched_secrets.get(TelegramEnvFields.API_ID.value)
         self.api_hash = fetched_secrets.get(TelegramEnvFields.API_HASH.value)
+        self.frontend_url = secrets_manager.frontend_url
 
         self.client = Client(
             name=self.bot_session_name,
@@ -131,6 +134,14 @@ class TelegramBot:
         await self._setup_client()
         logger.debug("Client setup complete")
         self.change_status(TelegramBotStatus.RUNNING)
+        await self.client.set_bot_commands(
+            [
+                BotCommand(command="signin", description="Sign in with Telegram"),
+                BotCommand(command="summary", description="Get your chat summaries"),
+            ]
+        )
+        menu_button = MenuButtonCommands()
+        await self.client.set_chat_menu_button(menu_button=menu_button)
 
         if handlers:
             await self.register_handlers(handlers)

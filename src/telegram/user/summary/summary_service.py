@@ -33,8 +33,8 @@ UNREAD_COUNT_CONTEXT_OFFSET = 20
 UNREAD_COUNT_NO_OFFSET_LIMIT = 100
 
 LOWEST_RATING = 0
-GROUP_HIGH_LIMIT = 200
-SUPERGROUP_HIGH_LIMIT = 200
+GROUP_HIGH_LIMIT = 50
+SUPERGROUP_HIGH_LIMIT = 50
 
 logger = getLogger("telegram.user.summary.summary_service")
 
@@ -91,13 +91,13 @@ class SummaryService:
         # Isolate group chats
         group_df = dialogs_df[dialogs_df["chat_type"] == "GROUP"]
         group_with_rating = group_df[group_df["rating"] > LOWEST_RATING]
-        small_group = group_df[group_df["user_count"] < GROUP_HIGH_LIMIT]
+        small_group = group_df[group_df["members_count"] < GROUP_HIGH_LIMIT]
 
         # Isolate superchats data
         supergroup_df = dialogs_df[dialogs_df["chat_type"] == "SUPERGROUP"]
         supergroup_with_rating = supergroup_df[supergroup_df["rating"] > LOWEST_RATING]
         small_supergroup = supergroup_df[
-            supergroup_df["user_count"] < SUPERGROUP_HIGH_LIMIT
+            supergroup_df["members_count"] < SUPERGROUP_HIGH_LIMIT
         ]
 
         # Isolate channels

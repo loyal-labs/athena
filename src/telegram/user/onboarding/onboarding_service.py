@@ -7,18 +7,24 @@ from pyrogram.client import Client
 from pyrogram.enums import ChatAction, ParseMode
 from pyrogram.raw.functions.messages.toggle_dialog_pin import ToggleDialogPin
 from pyrogram.raw.types.input_dialog_peer import InputDialogPeer
+from pyrogram.types import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    LoginUrl,
+    ReplyKeyboardRemove,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.shared.base import BaseService
 from src.shared.database import DatabaseFactory
 from src.telegram.bot.client.telegram_bot import TelegramBot, TelegramBotFactory
-from src.telegram.user.onboarding.onboarding_schemas import OnboardingSchema
-from src.telegram.user.onboarding.onboarding_texts import (
+from src.telegram.user.onboarding.onboarding_constants import (
     WELCOME_MESSAGE_1,
     WELCOME_MESSAGE_2,
     WELCOME_MESSAGE_3,
     WELCOME_MESSAGE_4,
 )
+from src.telegram.user.onboarding.onboarding_schemas import OnboardingSchema
 from src.telegram.user.summary.summary_schemas import (
     TelegramChatSummary,
     TelegramEntity,
@@ -46,6 +52,7 @@ class OnboardingService(BaseService):
 
         assert bot_client.me is not None
         assert bot_client.me.username is not None
+        assert bot.frontend_url is not None
 
         bot_id = bot_client.me.id
 
@@ -92,6 +99,7 @@ class OnboardingService(BaseService):
                 # Step 4: Pin the bot and mark as is_pinned and onboarded
                 await self._pin_bot(user_client, bot_id)
                 await self._mark_as_onboarded(owner_id, db_session)
+                await self.send_login_url(bot.frontend_url, owner_id, bot_client)
                 logger.debug(f"Marking user {owner_id} as onboarded")
 
             return True
@@ -138,7 +146,11 @@ class OnboardingService(BaseService):
 
         await client.send_chat_action(owner_id, ChatAction.TYPING)
         time.sleep(0.25)
-        await client.send_message(owner_id, WELCOME_MESSAGE_1)
+        await client.send_message(
+            owner_id,
+            WELCOME_MESSAGE_1,
+            reply_markup=ReplyKeyboardRemove(),
+        )
         await client.send_chat_action(owner_id, ChatAction.TYPING)
         time.sleep(2)
 
@@ -232,3 +244,35 @@ class OnboardingService(BaseService):
         except Exception as e:
             logger.error(f"Error pinning bot {peer_id}: {e}")
             raise e
+
+    async def send_login_url(
+        self, frontend_url: str, owner_id: int, bot_client: Client
+    ) -> None:
+        """Sends a login url to the user and pins the message"""
+        login_url_keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton(
+                        text="Open Athena",
+                        login_url=LoginUrl(
+                            url=frontend_url,
+                            forward_text="Open Athena",
+                            bot_username="athena_tgbot",
+                            button_id=1,
+                        ),
+                    ),
+                ]
+            ]
+        )
+        message_text = "welcome aboard! you can see your chat summaries in the app"
+        message = await bot_client.send_message(
+            owner_id,
+            message_text,
+            reply_markup=login_url_keyboard,
+        )
+
+        assert message is not None, "Message is None"
+        assert message.chat is not None, "Message chat is None"
+        assert isinstance(message.chat.id, int), "Message chat id is not an integer"
+
+        await bot_client.pin_chat_message(message.chat.id, message.id, both_sides=True)

@@ -176,5 +176,5 @@ testing_tg.py
 *.session
 *.session-journal
 
-### Deus Vult Misc ###
-data/*
+### Docker ###
+local-compose.yml
