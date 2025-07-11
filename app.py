@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.router import api_router
 from src.containers import Container, create_container, init_factory, init_service
+from src.telegram.pyrogram_patches import patch_pyrogram
 
 logger = logging.getLogger("athena.main-app-component")
 
@@ -18,6 +19,9 @@ logger = logging.getLogger("athena.main-app-component")
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
     logger.info("Starting up the application")
+
+    # Apply Pyrogram patches before initializing anything
+    patch_pyrogram()
 
     # --- Container Initialization ---
     logger.info("Initializing container")
@@ -49,11 +53,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         handlers = login_handlers.login_handlers + message_handlers.message_handlers
         await telegram.start(handlers=handlers)
 
-        # inbox_handlers = container.inbox_handlers()
-        # user_message_handlers = container.user_message_handlers()
-        # handlers = inbox_handlers.inbox_filters + user_message_handlers.summary_handlers
+        inbox_handlers = container.inbox_handlers()
+        user_message_handlers = container.user_message_handlers()
+        handlers = inbox_handlers.inbox_filters + user_message_handlers.summary_handlers
 
-        await tg_user_session.load_all_sessions(db)
+        await tg_user_session.load_all_sessions(db, handlers)
 
         # --- Database ---
 

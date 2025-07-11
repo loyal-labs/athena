@@ -227,16 +227,20 @@ class SummaryService:
         response_array: list[TelegramEntity] = []
 
         async for dialog in client.get_dialogs(limit=GET_CHAT_HISTORY_LIMIT):
-            chat_type = dialog.chat.type
-            if chat_type not in SUPPORTED_CHAT_TYPES:
+            try:
+                chat_type = dialog.chat.type
+                if chat_type not in SUPPORTED_CHAT_TYPES:
+                    continue
+
+                if dialog.top_message and dialog.top_message.date:
+                    if dialog.top_message.date < stop_date:
+                        break
+
+                entity = TelegramEntity.from_dialog(dialog, user_id)
+                response_array.append(entity)
+            except Exception as e:
+                logger.error(f"Error processing dialog: {e}")
                 continue
-
-            if dialog.top_message and dialog.top_message.date:
-                if dialog.top_message.date < stop_date:
-                    break
-
-            entity = TelegramEntity.from_dialog(dialog, user_id)
-            response_array.append(entity)
 
         return response_array
 

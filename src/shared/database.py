@@ -35,8 +35,8 @@ class Database:
 
     def __init__(self):
         # Constants
-        self.host = os.getenv("POSTGRES_HOST", self.default_host)
-        self.port = int(os.getenv("POSTGRES_PORT", self.default_port))
+        self.host: str | None = None
+        self.port: int | None = None
 
         # From 1Password
         self.user: str | None = None
@@ -103,6 +103,13 @@ class Database:
         self.user = fetched_secrets.get(DatabaseEnvFields.USER.value)
         self.db_name = fetched_secrets.get(DatabaseEnvFields.DATABASE.value)
         self.password = fetched_secrets.get(DatabaseEnvFields.PASSWORD.value)
+
+        if secrets_manager.deployment == "local":
+            self.host = "localhost"
+            self.port = 5432
+        else:
+            self.host = os.getenv("POSTGRES_HOST", self.default_host)
+            self.port = int(os.getenv("POSTGRES_PORT", self.default_port))
 
         self.url = self.__build_sqlalchemy_url(use_placeholder_password=False)
         self.safe_url = self.__build_sqlalchemy_url(use_placeholder_password=True)

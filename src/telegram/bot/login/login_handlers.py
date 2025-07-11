@@ -31,7 +31,14 @@ class LoginHandlers:
         assert web_app_data.data is not None, "Web app data is None"
 
         web_app_data_service_msg_content = web_app_data.data
-        web_app_data_str = cast(str, web_app_data_service_msg_content.data)  # type: ignore
+        try:
+            web_app_data_str = cast(str, web_app_data_service_msg_content.data)  # type: ignore
+        except AttributeError:
+            web_app_data_str = cast(str, web_app_data_service_msg_content)  # type: ignore
+        except Exception as e:
+            logger.error("Failed to parse web_app_data: %s", e)
+            raise ValueError(f"Failed to parse web_app_data: {e}") from e
+
         try:
             text_dict = orjson.loads(web_app_data_str.strip().encode("utf-8"))
         except orjson.JSONDecodeError as e:

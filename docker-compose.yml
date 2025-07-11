@@ -1,17 +1,21 @@
 services:
   web:
-    build: .
+    image: beloyal/athena:latest
     ports:
       - "8000:8000"
     environment:
-      OP_SERVICE_ACCOUNT_TOKEN: ${OP_SERVICE_ACCOUNT_TOKEN}
+      ONEPASS_CONNECT_TOKEN: ${ONEPASS_CONNECT_TOKEN}
+      ONEPASS_CONNECT_HOST: ${ONEPASS_CONNECT_HOST}
       LOGGING_LEVEL: "WARNING"
       GLOBAL_APP_ENV: "local"
       FRONTEND_URL: ${FRONTEND_URL}
-      POSTGRES_HOST: ${POSTGRES_HOST}
-      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
-      - .:/app
+      - /var/run/tappd.sock:/var/run/tappd.sock
     depends_on:
       - postgres
 
